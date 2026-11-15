@@ -1,6 +1,6 @@
 # 依存コンポーネント
 
-KuniWhatsThisAsset v0.9.0は.NET 10 / WPFおよびSharpAssimp 6.0.12を使用します。描画は標準WPF Viewport3Dを使用します。Prefab解析・キャッシュ・設定に追加ライブラリは導入していません。
+KuniWhatsThisAsset v0.9.1は.NET 10 / WPFおよびSharpAssimp 6.0.12を使用します。描画は標準WPF Viewport3Dを使用します。Prefab解析・キャッシュ・設定に追加ライブラリは導入していません。
 
 SharpAssimpの管理コードはMIT、同梱Assimpネイティブ部分はBSD 3-Clauseです。パッケージに含まれるPoly2Tri等の通知も含めた原文を`licenses/SharpAssimp-LICENSE.txt`へ同梱し、Help→ライセンスで表示します。ソース原本はNuGet 6.0.12のLICENSE.txtです。
 
@@ -21,5 +21,6 @@ SharpAssimpの管理コードはMIT、同梱Assimpネイティブ部分はBSD 3-
 
 
 ライセンスはアプリのHelp→ライセンスからも確認できます。文書の原本はsrc/KuniWhatsThisAsset.App/Licenses/に保持し、発行先へ自動コピーします。
+
 
 

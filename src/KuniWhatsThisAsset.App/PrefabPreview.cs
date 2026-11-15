@@ -12,6 +12,8 @@ public static class PrefabPreviewBuilder
         var models = new Dictionary<string, (PackageItem Item, ModelPreviewData Data, string Meta)>(StringComparer.OrdinalIgnoreCase);
         var bindings = new Dictionary<string, string>(); var path = new HashSet<string>(); int visited = 0, unmatched = 0;
         var referencedMaterials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var resolver = new MaterialResolver(reader, report, token);
+        var resolutions = new Dictionary<string, MaterialResolution>(StringComparer.OrdinalIgnoreCase);
         async Task<(PackageItem Item, ModelPreviewData Data, string Meta)?> Model(string guid)
         {
             if (guid.Length != 32) { notes.Add("継承Rendererや内蔵Meshなど、モデル参照を直接解決できない項目があります。"); return null; }
@@ -22,21 +24,18 @@ public static class PrefabPreviewBuilder
             var bytes = await Task.Run(() => reader.ReadAssetBytes(report.SourcePath, guid, 256 * 1024 * 1024, token), token);
             var data = await ModelWorker.ImportAsync(new(source.Path, bytes, new()), token);
             string meta = TextDecoder.Decode(await Task.Run(() => reader.ReadAssetMetaBytes(report.SourcePath, guid, token), token), false, out _);
-            var result = (source, data, meta); models[guid] = result; return result;
+            var result = (source, data, meta); models[guid] = result;
+            resolutions[guid] = await Task.Run(() => resolver.Resolve(source, meta, data), token);
+            return result;
         }
         void Add(PreviewMesh mesh, string sourceGuid, string materialGuid, (PackageItem Item, ModelPreviewData Data, string Meta) source)
         {
             token.ThrowIfCancellationRequested();
             if (materialGuid.Length == 0)
             {
-                var remap = PrefabAnalysis.Matches(source.Meta, @"^\s+name: ([^\r\n]+)\r?\n\s+second: \{fileID: 2100000, guid: ([0-9a-fA-F]{32})").FirstOrDefault(m => m.Groups[1].Value.Trim() == mesh.MaterialName);
-                materialGuid = remap?.Groups[2].Value ?? "";
-                if (materialGuid.Length == 0)
-                {
-                    string folder = source.Item.Path[..Math.Max(0, source.Item.Path.LastIndexOf('/'))] + "/";
-                    var candidates = report.Items.Where(i => i.Format == ".mat" && i.Path.StartsWith(folder, StringComparison.OrdinalIgnoreCase) && Path.GetFileNameWithoutExtension(i.Path) == mesh.MaterialName).ToArray();
-                    if (candidates.Length == 1) materialGuid = candidates[0].Guid;
-                }
+                var resolution = resolutions[sourceGuid];
+                if (resolution.Selected.TryGetValue(mesh.MaterialName, out var material)) materialGuid = material.Guid;
+                else if (resolution.Issues.TryGetValue(mesh.MaterialName, out var issue)) notes.Add(issue.Length <= 4096 ? issue : issue[..4096]);
             }
             string key = materialGuid.Length == 32 ? "material_" + materialGuid : sourceGuid + "_" + mesh.MaterialName;
             if (materialGuid.Length == 32) bindings[key] = materialGuid;
@@ -56,7 +55,7 @@ public static class PrefabPreviewBuilder
                 {
                     foreach (string guid in renderer.Materials.Where(g => g.Length == 32)) referencedMaterials.Add(guid);
                     var source = await Model(renderer.Mesh.Guid); if (source == null) continue;
-                    string name = PrefabAnalysis.Matches(source.Value.Meta, @"^    " + System.Text.RegularExpressions.Regex.Escape(renderer.Mesh.FileId) + @": ([^\r\n]+)").FirstOrDefault()?.Groups[1].Value.Trim() ?? renderer.Name;
+                    string name = MaterialResolver.MeshNodeName(source.Value.Meta, renderer);
                     var selected = source.Value.Data.Meshes.Where(m => m.NodeName == name).ToArray();
                     if (selected.Length == 0) { unmatched++; continue; }
                     for (int i = 0; i < selected.Length; i++) Add(selected[i], renderer.Mesh.Guid, i < renderer.Materials.Length ? renderer.Materials[i] : "", source.Value);
@@ -81,7 +80,7 @@ public static class PrefabPreviewBuilder
         if (unmatched > 0) notes.Add($"メッシュ名を解決できないRenderer {unmatched}件を省略しました。");
         notes.Add("Prefab静止近似：有効Renderer・参照材質を使用。配置変更・Bone姿勢・BlendShape・Scriptは未反映。");
         var stats = new ModelStatistics(meshes.Sum(m => (long)m.Positions.Length / 3), meshes.Sum(m => (long)m.Indices.Length / 3), meshes.Count, Math.Max(referencedMaterials.Concat(bindings.Values).Distinct(StringComparer.OrdinalIgnoreCase).Count(), meshes.Select(m => m.MaterialName).Distinct().Count()), models.Values.Sum(m => m.Data.Statistics.BoneCount), models.Values.Any(m => m.Data.Statistics.HasSkinning));
-        var data = new ModelPreviewData(stats, meshes.ToArray(), notes.ToArray()); data.Validate();
+        var data = new ModelPreviewData(stats, meshes.ToArray(), notes.Take(32).ToArray()); data.Validate();
         var metadata = new StringBuilder("ModelImporter:\n  externalObjects:\n");
         foreach (var (name, guid) in bindings) metadata.Append($"  - first:\n      name: {name}\n    second: {{fileID: 2100000, guid: {guid}, type: 2}}\n");
         return new(data, metadata.ToString());

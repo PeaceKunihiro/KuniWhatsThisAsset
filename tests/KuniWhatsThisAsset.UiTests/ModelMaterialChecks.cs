@@ -43,6 +43,8 @@ internal static class ModelMaterialChecks
         var source = (BitmapSource)((ImageBrush)((DiffuseMaterial)mapped.Children[0]).Brush).ImageSource;
         var result = new byte[8]; source.CopyPixels(result, 8, 0);
         if (!mapped.IsFrozen || result[2] != 255 || result[3] != 255 || result[7] != 0) throw new Exception("Material remap, texture color or alpha mask incorrect");
+        var unresolved = ModelMaterials.LoadDetailed(reader, report, report.Items.Single(i => i.Guid == modelGuid), metadata.Replace(materialGuid, new string('f', 32)), data, CancellationToken.None);
+        if (unresolved.Materials.Count != 0 || !unresolved.Notes.Any(n => n.Contains("明示参照先"))) throw new Exception("Missing material explanation was lost");
         Console.WriteLine("PASS bulk asset/meta capture, Unity material remap, texture color and alpha-mask cutout");
     }
 }

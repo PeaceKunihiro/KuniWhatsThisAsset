@@ -15,7 +15,7 @@ public sealed class RenderCache(string directory)
     {
         await using var stream = File.OpenRead(packagePath);
         var digest = await SHA256.HashDataAsync(stream, token).ConfigureAwait(false);
-        return Hash(Encoding.UTF8.GetBytes("kwta-render-v0.9.0-1:" + Convert.ToHexString(digest) + ":" + assetGuid));
+        return Hash(Encoding.UTF8.GetBytes("kwta-render-v0.9.1-1:" + Convert.ToHexString(digest) + ":" + assetGuid));
     }
     private string PathFor(string key, string suffix)
     {

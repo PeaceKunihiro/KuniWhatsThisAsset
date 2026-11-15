@@ -96,9 +96,10 @@ public partial class MainWindow
             if (!approved) { PreviewHint.Text = "モデルのレンダリングを中止しました。"; return; }
             // No WPF mesh or scene is created until the load warning has been approved.
             PreviewHint.Text = "テクスチャを読み込み中…";
-            var materials = await Task.Run(() => ModelMaterials.Load(new PackageReader(limits), source, item, metadataText, model, cts.Token), cts.Token);
+            var materialResult = await Task.Run(() => ModelMaterials.LoadDetailed(new PackageReader(limits), source, item, metadataText, model, cts.Token), cts.Token);
+            model = model with { Notes = model.Notes.Concat(materialResult.Notes).Distinct().Take(100).ToArray() };
             cts.Token.ThrowIfCancellationRequested();
-            ModelView.SetModel(model, materials); ModelView.Visibility = Visibility.Visible; PreviewHint.Text = "";
+            ModelView.SetModel(model, materialResult.Materials); ModelView.Visibility = Visibility.Visible; PreviewHint.Text = "";
             Status.Text = $"{item.Name} · {stats.TriangleCount:N0}ポリゴン（三角形） · Material {stats.MaterialCount:N0}";
             try
             {

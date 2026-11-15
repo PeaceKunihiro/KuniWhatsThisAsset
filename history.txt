@@ -71,3 +71,17 @@
 - Core 53件・WPF UI検証成功。Fuzzy/Luchika実Prefabの表示と正面/側面/平面の透過画像を目視確認。
 - Releaseビルド警告0・エラー0、自己完結型発行のworkerでNative/assimp.dllを使用したOBJ解析成功。
 - Stableへv0.9.0 ZIP/SHA256を作成。テスト用アセット/検証画像/ユーザー設定は配布しない。
+
+2026-11-16 テクスチャ参照障害の解析
+- Akyo PC/QuestのFBX・Prefab、5000ポリネコメイドのFBX・Prefabの計6経路を、既存キャッシュを介さず検証。
+- Akyoは兄弟Materialsフォルダーの探索不足、ネコメイドFBXは材質名の不一致を特定。ネコメイドの設定済Prefabは現行でも正常。
+- 明示材質GUIDをメモリ上で与えた診断では全件でテクスチャを反映。PNG欠落・UV欠損は主因ではない。
+- Documents/TextureReferenceAnalysis-2026-11-16.mdへ原因・参照関係・修正方針を記録。アプリと配布ZIPは未変更（v0.9.0）。
+
+2026-11-16 v0.9.1
+- 材質Resolverを共通化し、親方向Materialsとmeta検索/命名設定、明示GUID優先に対応。
+- 名前が異なる材質をPrefabのMesh/スロットから一意に補完。複数Prefabの競合や関連Prefab差分の材質変更は推定しない。
+- 未解決材質・画像の理由をプレビューへ表示。描画改訂番号を更新し旧単色キャッシュを回避。
+- Akyo PC/Quest・ネコメイドのFBX/Prefab全6経路で、強制割り当てなしの材質GUID選択とテクスチャ描画が成功。
+- Fuzzy/Luchika回帰確認、Core 53件、UI・材質探索/競合拒否検証が成功。
+- ビルド警告0・エラー0、自己完結型workerスモーク成功。StableへZIP/SHA256を作成し、ライセンスとユーザーデータ非混入を確認。

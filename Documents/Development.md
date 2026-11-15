@@ -110,3 +110,15 @@ UserPreferences/PreferenceStoreで上限・履歴10件・フォルダーブッ�
 Fuzzy/Luchika実Prefabで三方向の透過写真を目視確認。通常テストは独立したartifacts内プロファイルと自作モデルを使用し、ユーザー設定・キャッシュを汚さない。
 
 参考：[Unity YAML Prefab serialization](https://docs.unity.com/en-us/engine/6000.0/manual/working-with-scenes/text-scene-format/yaml-prefab-serialization)、[Unity YAML scene example](https://docs.unity.com/en-us/engine/6000.0/manual/working-with-scenes/text-scene-format/yamlscene-example)
+
+## v0.9.1 材質解決の共通化
+
+MaterialResolverをFBX/OBJの直接表示とPrefabPreviewBuilderで共有する。明示GUIDを優先し、命名設定0/1/2、検索設定Local/RecursiveUp/Everywhereを扱う。Everywhereもパッケージ内に限定する。既存のモデル配下に一意の材質がある構成への補完を維持する。近いMaterialsから順に探索し、同順位の複数候補は自動選択しない。
+
+名前から解決しない場合は、パッケージ内Prefabの直接Rendererを読み、同じ元モデルのMesh ID/ノード名・スロットから材質GUIDを補完する。推定では全Prefabを確認し、異なるGUIDがあれば未解決とする。件数上限32・各16 MiB・合計64 MiBを超える場合や、未対応Prefabが混じる場合は推定を省略する。元ファイルの書き換えや外部画像パスの読み込みは行わない。
+
+ModelMaterials.LoadDetailedで未解決・画像デコード失敗の説明を返し、ModelPreviewがプレビューとキャッシュの注記へ反映する。RenderCacheの改訂番号はv0.9.1-1とし、旧版の単色写真を再利用しない。
+
+通常UIテストに親探索・Local制限・近傍優先・GUID優先・命名・Prefab補完・競合拒否を追加。--texture-modelsでユーザー提供のAkyo/ネコメイドの6経路を、本番の解決処理のみで検証できる。
+
+参考：[Unityの列挙値定義](https://github.com/Unity-Technologies/UnityCsReference/blob/master/Modules/AssetPipelineEditor/Public/ModelImporting/ModelImporter.bindings.cs)、[親方向のMaterials探索](https://docs.unity3d.com/ja/6000.0/ScriptReference/ModelImporterMaterialSearch.RecursiveUp.html)

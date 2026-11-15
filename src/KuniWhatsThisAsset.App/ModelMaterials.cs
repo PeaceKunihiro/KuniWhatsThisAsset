@@ -9,29 +9,20 @@ using KuniWhatsThisAsset.Core;
 
 namespace KuniWhatsThisAsset.App;
 
+public sealed record ModelMaterialResult(Dictionary<string, Material> Materials, string[] Notes);
+
 // Reads only known scalar/texture fields. Unity scripts and shaders are never executed.
 public static class ModelMaterials
 {
     private static MatchCollection Matches(string text, string pattern) => Regex.Matches(text, pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
     private static string Decode(byte[] bytes) => TextDecoder.Decode(bytes, false, out _);
     public static Dictionary<string, Material> Load(PackageReader reader, PackageReport report, PackageItem modelItem, string metadata, ModelPreviewData model, CancellationToken token)
+        => LoadDetailed(reader, report, modelItem, metadata, model, token).Materials;
+    public static ModelMaterialResult LoadDetailed(PackageReader reader, PackageReport report, PackageItem modelItem, string metadata, ModelPreviewData model, CancellationToken token)
     {
-        var names = model.Meshes.Select(m => m.MaterialName).Distinct(StringComparer.Ordinal).ToArray();
-        var remaps = Matches(metadata, @"(?m)^\s+name: ([^\r\n]+)\r?\n\s+second: \{fileID: 2100000, guid: ([0-9a-fA-F]{32})")
-            .GroupBy(m => m.Groups[1].Value.Trim()).ToDictionary(g => g.Key, g => g.First().Groups[2].Value);
-        string folder = modelItem.Path[..Math.Max(0, modelItem.Path.LastIndexOf('/'))] + "/";
-        var selected = new Dictionary<string, PackageItem>(StringComparer.Ordinal);
-        foreach (string name in names)
-        {
-            var item = remaps.TryGetValue(name, out var guid) ? report.Items.FirstOrDefault(i => i.Guid.Equals(guid, StringComparison.OrdinalIgnoreCase) && i.Format == ".mat") : null;
-            // Name fallback is restricted to the model's own directory tree; ambiguous variants are not guessed.
-            if (item == null && !remaps.ContainsKey(name))
-            {
-                var candidates = report.Items.Where(i => i.Format == ".mat" && i.Path.StartsWith(folder, StringComparison.OrdinalIgnoreCase) && Path.GetFileNameWithoutExtension(i.Path) == name).ToArray();
-                if (candidates.Length == 1) item = candidates[0];
-            }
-            if (item != null) selected[name] = item;
-        }
+        var resolution = new MaterialResolver(reader, report, token).Resolve(modelItem, metadata, model);
+        var selected = resolution.Selected;
+        var notes = resolution.Issues.Values.ToList();
         var materialBytes = reader.ReadAssetSet(report.SourcePath, selected.Values.Select(i => i.Guid).Distinct().ToArray(), maxFileBytes: 2 * 1024 * 1024, maxTotalBytes: 16 * 1024 * 1024, cancellationToken: token);
         var descriptions = new Dictionary<string, Description>(StringComparer.Ordinal);
         foreach (var (name, item) in selected)
@@ -48,11 +39,15 @@ public static class ModelMaterials
         var textures = report.Items.Where(i => textureIds.Contains(i.Guid, StringComparer.OrdinalIgnoreCase) && ImagePreviewDecoder.Supports(i.Path)).ToDictionary(i => i.Guid, StringComparer.OrdinalIgnoreCase);
         var imageBytes = reader.ReadAssetSet(report.SourcePath, textures.Keys.ToArray(), maxTotalBytes: 256L * 1024 * 1024, cancellationToken: token);
         var decoded = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
+        var imageIssues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         long decodedPixels = 0;
         BitmapSource? Image(string guid)
         {
             if (decoded.TryGetValue(guid, out var cached)) return cached;
-            if (!textures.TryGetValue(guid, out var item) || !imageBytes.TryGetValue(guid, out var bytes)) return null;
+            if (!textures.TryGetValue(guid, out var item) || !imageBytes.TryGetValue(guid, out var bytes))
+            {
+                imageIssues[guid] = report.Items.Any(i => i.Guid.Equals(guid, StringComparison.OrdinalIgnoreCase)) ? "画像形式が未対応、または画像データを取得できません" : "画像GUIDの参照先がパッケージ内にありません"; return null;
+            }
             try
             {
                 token.ThrowIfCancellationRequested();
@@ -60,20 +55,21 @@ public static class ModelMaterials
                 double scale = Math.Min(1, 2048d / Math.Max(source.PixelWidth, source.PixelHeight));
                 BitmapSource resized = scale < 1 ? new TransformedBitmap(source, new ScaleTransform(scale, scale)) : source;
                 long count = (long)resized.PixelWidth * resized.PixelHeight;
-                if (decodedPixels + count > 32L * 1024 * 1024) return null;
+                if (decodedPixels + count > 32L * 1024 * 1024) { imageIssues[guid] = "テクスチャの総画素上限を超えています"; return null; }
                 // Detach the resized pixels so the original 4K decoding buffer can be collected.
                 int stride = resized.PixelWidth * 4; var pixels = new byte[stride * resized.PixelHeight];
                 resized.CopyPixels(pixels, stride, 0);
                 var result = BitmapSource.Create(resized.PixelWidth, resized.PixelHeight, 96, 96, PixelFormats.Bgra32, null, pixels, stride); result.Freeze();
                 decodedPixels += count; decoded[guid] = result; return result;
             }
-            catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or InvalidOperationException or System.Runtime.InteropServices.COMException) { return null; }
+            catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or InvalidOperationException or System.Runtime.InteropServices.COMException) { imageIssues[guid] = "画像を復号できません: " + ex.Message; return null; }
         }
         var output = new Dictionary<string, Material>(StringComparer.Ordinal);
         foreach (var (name, description) in descriptions)
         {
             token.ThrowIfCancellationRequested();
-            var bitmap = Image(description.Texture);
+            var bitmap = description.Texture.Length > 0 ? Image(description.Texture) : null;
+            if (description.Texture.Length > 0 && bitmap == null) notes.Add($"材質「{name}」: {imageIssues.GetValueOrDefault(description.Texture, "主テクスチャ未解決")}（基本色で表示）。");
             Brush brush;
             if (bitmap == null) brush = new SolidColorBrush(description.Color);
             else
@@ -81,6 +77,7 @@ public static class ModelMaterials
                 int w = bitmap.PixelWidth, h = bitmap.PixelHeight, stride = w * 4;
                 var pixels = new byte[stride * h]; bitmap.CopyPixels(pixels, stride, 0);
                 var mask = description.MaskMode > 0 ? Image(description.Mask) : null;
+                if (description.MaskMode > 0 && description.Mask.Length > 0 && mask == null) notes.Add($"材質「{name}」: 透過マスクを読み込めません。");
                 byte[]? maskPixels = null;
                 if (mask != null)
                 {
@@ -101,7 +98,7 @@ public static class ModelMaterials
             var material = new MaterialGroup(); material.Children.Add(new DiffuseMaterial(brush));
             material.Freeze(); output[name] = material;
         }
-        return output;
+        return new(output, notes.Distinct().Take(16).Select(n => n.Length <= 4096 ? n : n[..4096]).ToArray());
     }
     private sealed record Description(string Texture, string Mask, Color Color, bool Transparent, float Cutoff, int MaskMode);
     private static Description Parse(string text)

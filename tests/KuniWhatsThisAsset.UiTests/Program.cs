@@ -10,6 +10,7 @@ internal static class Program
     private static int Main()
     {
         if (Environment.GetCommandLineArgs().Contains("--real-models")) return RealModelChecks.Run();
+        if (Environment.GetCommandLineArgs().Contains("--texture-models")) return TextureModelChecks.Run();
         var app = new App(); app.InitializeComponent();
         var main = new MainWindow(System.IO.Path.GetFullPath("artifacts/ui-profile-" + Guid.NewGuid().ToString("N")));
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
@@ -258,6 +259,7 @@ internal static class Program
             Check(metaPrompts == 1 && Field<ModelViewport>("ModelView").Visibility == Visibility.Collapsed, "Declined Unity-material model rendered");
             Console.WriteLine("PASS package MTL pre-render warning with approval and Unity meta references with refusal");
             ModelMaterialChecks.Run();
+            MaterialResolverChecks.Run();
             FeatureChecks.Run(main);
             return 0;
         }

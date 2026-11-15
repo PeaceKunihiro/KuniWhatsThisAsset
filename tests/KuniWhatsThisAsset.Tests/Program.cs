@@ -327,6 +327,8 @@ Test("cache identity covers package bytes and selected asset", () =>
 {
     string file = Path.Combine(output, "hash-input.bin"); File.WriteAllText(file, "first");
     string a = RenderCache.KeyAsync(file, guid, CancellationToken.None).GetAwaiter().GetResult();
+    // Historical v0.9.0 key for this fixture: the old single-color photo must not be reused.
+    Check(a != "e5388caa2e07eaee33250e919182865b725be427f7b819acf5d3365e3e699775", "Old renderer cache identity was reused");
     string b = RenderCache.KeyAsync(file, new string('b', 32), CancellationToken.None).GetAwaiter().GetResult();
     File.WriteAllText(file, "other"); string c = RenderCache.KeyAsync(file, guid, CancellationToken.None).GetAwaiter().GetResult();
     Check(a != b && a != c, "Changed package or asset retained cache identity");
