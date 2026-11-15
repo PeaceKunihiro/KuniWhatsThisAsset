@@ -1,5 +1,7 @@
 # KuniWhatsThisAsset 簡易仕様書
 
+配布用ZIPおよび対応するSHA256ファイルは、プロジェクト直下の`Stable/`へ出力・集約する。展開済みのビルド成果物は`artifacts/`に保持する。
+
 ## 1. 目的
 
 UnityPackageをUnity Projectへ導入する前に、

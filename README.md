@@ -155,6 +155,8 @@ dotnet run --project src/KuniWhatsThisAsset.App -c Release --no-build
 
 ### Windows x64版の発行
 
+配布用ZIPと対応する`.sha256`ファイルは、プロジェクト直下の`Stable/`にまとめます。展開済みのビルド成果物は`artifacts/`で管理します。
+
 次のコマンドはランタイムパックの取得にネットワーク接続を使用します。出力先はGit管理対象外です。
 
 ```powershell
