@@ -6,9 +6,9 @@ KuniWhatsThisAssetは、`.unitypackage`に含まれるファイルと危険要�
 
 ## バージョン・開発状況
 
-**v0.4.0 — 警告ウィンドウ分離対応版**
+**v0.5.0 — 画像・Shift-JIS対応版**
 
-パッケージの読み込み、内容物一覧、ルールによる静的な危険要素検出を実装しました。モデルプレビュー・用途推定は未対応です。参考画像に沿って大きくUIを変更したため、バージョン管理規則に従いv0.4.0としています。
+パッケージの読み込み、内容物一覧、ルールによる静的な危険要素検出を実装しました。モデルプレビュー・用途推定は未対応です。参考画像に沿って大きくUIを変更したため、バージョン管理規則に従いv0.5.0としています。
 
 ## 使い方
 
@@ -49,9 +49,19 @@ KuniWhatsThisAssetは、`.unitypackage`に含まれるファイルと危険要�
 - 実行ファイルや不審なコード、異常なアーカイブ構造の検出・警告
 - 検出対象ファイルと判定理由の表示
 - ツリーのAlt＋左クリック一括展開・格納と、選択履歴の戻る・進む
-- 対応テキスト形式のプレビュー（UTF-8 / BOM付きUTF-16）
+- 対応テキスト形式のプレビュー（UTF-8 / BOM付きUTF-16 / Shift-JIS）
 - 読み込みのキャンセルと解析時間の制限
 - CLIによるJSON形式の解析結果出力
+
+### 画像プレビュー
+
+ツリーで画像を選択すると、右側の領域に縦横比を保って表示します。PNG / JPEG / BMP / GIF / TIFF / ICOに対応し、GIF・TIFF・ICOは先頭フレームを表示します。TGA / DDS / PSD / SVGは未対応です。
+
+画像選択時はパッケージを再検証し、選択したアセットの完全なデータをメモリへ読み込みます。ディスク展開や外部URLへのアクセスは行いません。プレビューの入力は64 MiB、各辺16,384ピクセル、合計1,600万画素までです。この上限は読み込み継続承認とは独立した画像表示の制限です。表示できない場合はプレビュー領域に理由を表示します。
+
+### テキストの文字コード
+
+BOMがある場合はUTF-8 / UTF-16を優先し、BOMなしでは厳密なUTF-8を試した後、失敗時にShift-JIS（Windows CP932）を試します。判定は推定であり、両方で解釈できるバイト列はUTF-8を優先します。復号したテキストは表示と危険要素検出の両方に使います。どちらでも復号できない場合は警告します。解析サンプルの末尾で切れた文字は次の文字コードへの切り替え理由にしません。
 
 ## 今後の開発予定
 
@@ -63,7 +73,7 @@ KuniWhatsThisAssetは、`.unitypackage`に含まれるファイルと危険要�
 
 ### 3. その他の機能
 
-- 画像のプレビュー、テキストプレビューの拡張
+- TGA / DDS等への画像対応拡張、テキストプレビューの拡張
 - アバター、衣装、小物、ワールド、Udon / UdonSharp、Editor拡張、Shader、UI等の用途推定
 - 用途の推定根拠の表示
 - Unity YAMLやGUID参照などの解析
@@ -148,7 +158,7 @@ dotnet run --project src/KuniWhatsThisAsset.App -c Release --no-build
 次のコマンドはランタイムパックの取得にネットワーク接続を使用します。出力先はGit管理対象外です。
 
 ```powershell
-dotnet publish src/KuniWhatsThisAsset.App -c Release -r win-x64 --self-contained true --source https://api.nuget.org/v3/index.json -o artifacts/KuniWhatsThisAsset-v0.4.0-win-x64
+dotnet publish src/KuniWhatsThisAsset.App -c Release -r win-x64 --self-contained true --source https://api.nuget.org/v3/index.json -o artifacts/KuniWhatsThisAsset-v0.5.0-win-x64
 ```
 
 配布時には.NETランタイムのライセンスと第三者通知も同梱してください。詳細は[技術選定・依存関係](Documents/Development.md)を参照してください。
@@ -173,6 +183,7 @@ dotnet run --project src/KuniWhatsThisAsset.Cli -c Release --no-build -- "D:\Ass
 ## ライセンス
 
 本プロジェクトのライセンスは未定です。.NET等の依存コンポーネントにはそれぞれのライセンスが適用されます。公開配布時のプロジェクトライセンスは決定後に明記します。
+
 
 
 

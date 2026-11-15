@@ -11,6 +11,20 @@ public sealed class PackageReader
     private readonly ScanLimits limits;
     public PackageReader(ScanLimits? limits = null) => this.limits = limits ?? new();
 
+    private sealed class AssetCapture(string guid, int maxBytes)
+    {
+        public string Guid { get; } = guid;
+        public int MaxBytes { get; } = maxBytes;
+        public byte[]? Bytes;
+    }
+    public byte[] ReadAssetBytes(string file, string guid, int maxBytes = 64 * 1024 * 1024, CancellationToken cancellationToken = default)
+    {
+        var capture = new AssetCapture(guid, maxBytes);
+        try { ReadInternal(file, cancellationToken, null, capture); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { throw new ReadLimitExceededException(ReadLimitKind.Timeout, "画像の読み込み時間の上限に達しました。"); }
+        return capture.Bytes ?? throw new InvalidDataException("選択したアセットが見つかりません。パッケージを再読み込みしてください。");
+    }
     private sealed class Asset
     {
         public string? Path;
@@ -27,7 +41,7 @@ public sealed class PackageReader
         { throw new ReadLimitExceededException(ReadLimitKind.Timeout, "解析時間の上限に達しました。"); }
     }
 
-    private PackageReport ReadInternal(string file, CancellationToken cancellationToken, IProgress<int>? progress)
+    private PackageReport ReadInternal(string file, CancellationToken cancellationToken, IProgress<int>? progress, AssetCapture? capture = null)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         if (!limits.IgnoreReadLimits) deadline.CancelAfter(limits.Timeout);
@@ -92,7 +106,8 @@ public sealed class PackageReader
                 case "asset.meta":
                     // pathname may follow asset, so sample first and classify after reading the archive.
                     int capacity = Math.Min(limits.MaxTextBytes, sampleBudget);
-                    byte[] sample = ReadSample(entry, Math.Max(4096, capacity), token);
+                    byte[] sample = ReadSample(entry, Math.Max(4096, capacity), token,
+                        parts[1] == "asset" && capture?.Guid.Equals(parts[0], StringComparison.OrdinalIgnoreCase) == true ? capture : null);
                     sampleBudget -= Math.Min(sample.Length, capacity);
                     if (parts[1] == "asset") { asset.Size = entry.Length; asset.Sample = sample; }
                     else { asset.Meta = sample; asset.MetaSize = entry.Length; }
@@ -160,8 +175,10 @@ public sealed class PackageReader
         }
     }
 
-    private static byte[] ReadSample(TarEntry entry, int capacity, CancellationToken token)
+    private static byte[] ReadSample(TarEntry entry, int capacity, CancellationToken token, AssetCapture? capture = null)
     {
+        if (capture != null && entry.Length > capture.MaxBytes) throw new InvalidDataException("画像プレビューの入力上限（64 MiB）を超えています。");
+        using var captured = capture == null ? null : new MemoryStream();
         using var memory = new MemoryStream();
         byte[] buffer = new byte[64 * 1024];
         long total = 0;
@@ -173,10 +190,12 @@ public sealed class PackageReader
                 token.ThrowIfCancellationRequested();
                 int keep = (int)Math.Min(read, Math.Max(0, capacity - memory.Length));
                 if (keep > 0) memory.Write(buffer, 0, keep);
+                captured?.Write(buffer, 0, read);
                 total += read;
             }
         }
         if (total != entry.Length) throw new InvalidDataException("アーカイブ内のファイルが途中で切れています。");
+        if (capture != null) capture.Bytes = captured!.ToArray();
         return memory.ToArray();
     }
 
@@ -271,6 +290,7 @@ public sealed class PackageReader
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }
+
 
 
 

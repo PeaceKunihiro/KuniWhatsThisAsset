@@ -66,3 +66,15 @@ GUIは読み込み容量・件数・解析時間の上限で確認し、承認�
 GUIで継続を承認した読み込みにはIgnoreReadLimitsを適用し、容量・件数・解析時間の上限をすべて無効化する。次回の読み込みや既定のScanLimitsは変更しない。解析サンプルの予算、構造・CRC検証、キャンセルは維持する。
 
 警告欄はGridSplitterで高さを変えられるGrid行へ配置。同じWPFビューを独立ウィンドウへ移動し、復帰時に元のContentControlへ再格納する。WPFテストで高さの変更、繰り返し分離・復帰、共有ビューの更新、正常時の非表示を確認した。マウスによる実ドラッグの確認は別途行う。
+
+## v0.5.0 技術検証・採用
+
+追加OSSは不要。Shift-JISには.NET標準のCodePagesEncodingProvider（CP932）、画像にはWPF標準の明示的なPNG/JPEG/BMP/GIF/TIFF/ICOデコーダーを使用する。Windowsランタイムの既存ライセンス条件で扱い、追加NuGetパッケージは導入しない。
+
+- [公式 CodePagesEncodingProvider](https://learn.microsoft.com/en-us/dotnet/api/system.text.codepagesencodingprovider)
+- [公式 WPF Imaging Overview](https://learn.microsoft.com/en-us/dotnet/framework/wpf/graphics-multimedia/imaging-overview)
+- [公式 BitmapDecoder](https://learn.microsoft.com/en-us/dotnet/api/system.windows.media.imaging.bitmapdecoder)
+
+画像は選択時にアーカイブを再走査・検証するため、大きいパッケージでは表示まで時間がかかる。現在の読み込み承認設定を引き継ぐ。画像入力自体は64 MiBまで、復号前の寸法確認後、各辺16,384かつ合計1,600万画素以内の先頭フレームをBGRA32へコピーしてストリームから独立した画像にする。選択変更時は読み込みをキャンセルし、遅れて終了した結果を表示しない。TGA/DDS/PSD/SVGは未対応。デコーダー自体の処理中断は行えず、キャンセルは復号の前後で確認する。
+
+WPF検証で形式別の復号と破損拒否、パッケージを作成して画像を選択・表示しテキストへ切り替える経路を確認。解析テストではCP932日本語とコード検出、BOM・サンプル末尾、完全なアセット取得と容量制限・破損検証を確認した。

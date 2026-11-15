@@ -189,7 +189,35 @@ Test("approved reading bypasses all resource limits but preserves integrity and 
     catch (OperationCanceledException) { return; }
     throw new Exception("Cancellation bypassed");
 });
+Test("Shift-JIS preview and static analysis", () =>
+{
+    Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+    byte[] bytes = Encoding.GetEncoding(932).GetBytes("// 日本語の説明です\nProcess.Start(x);");
+    var scan = SecurityScanner.Scan("Assets/test.cs", bytes, bytes.Length);
+    Check(scan.Text!.Contains("日本語の説明です"), "Shift-JIS mojibake");
+    Check(scan.Findings.Any(f => f.Code == "PROCESS"), "Shift-JIS code not scanned");
+    Check(!scan.Findings.Any(f => f.Code == "TEXT_ENCODING"), "Valid Shift-JIS warned");
+});
+Test("UTF8 BOM and clipped multibyte sample", () =>
+{
+    byte[] bytes = Encoding.UTF8.GetPreamble().Concat(Utf8("日本語")).ToArray();
+    Check(TextDecoder.Decode(bytes, false, out bool bad) == "日本語" && !bad, "BOM not removed");
+    byte[] clipped = Utf8("説明文")[..^1];
+    Check(TextDecoder.Decode(clipped, true, out bad) == "説明" && !bad, "Clipped UTF8 incorrectly fell back");
+    TextDecoder.Decode([0x81, 0x30], false, out bad);
+    Check(bad, "Invalid UTF8/CP932 not warned");
+});
+Test("full selected asset read beyond sample budget and input cap", () =>
+{
+    byte[] data = new byte[3 * 1024 * 1024]; data[^1] = 123;
+    string file = Archive("image-data", tar => Asset(tar, guid, "Assets/texture.png", data));
+    var reader = new PackageReader();
+    Check(reader.ReadAssetBytes(file, guid).SequenceEqual(data), "Image data was truncated");
+    Reject(() => reader.ReadAssetBytes(file, guid, maxBytes: 1024));
+    Reject(() => reader.ReadAssetBytes(Path.Combine(output, "bad-crc.unitypackage"), guid));
+});
 Console.WriteLine($"\n{passed} passed, {failed} failed. Fixtures: {output}");
 return failed == 0 ? 0 : 1;
+
 
 

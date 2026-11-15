@@ -2,8 +2,9 @@
  <StackPanel Margin="28" HorizontalAlignment="Center">
   <Image Source="Assets/KWTA_icon.png" Width="220" Height="230" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
   <TextBlock Text="KuniWhatsThisAsset" FontSize="24" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,12,0,5"/>
-  <TextBlock Text="Version 0.4.0" FontSize="16" HorizontalAlignment="Center" Foreground="#70533D"/>
+  <TextBlock Text="Version 0.5.0" FontSize="16" HorizontalAlignment="Center" Foreground="#70533D"/>
   <Button Content="閉じる" IsCancel="True" Width="100" Margin="0,20,0,0"/>
  </StackPanel>
 </Window>
+
 

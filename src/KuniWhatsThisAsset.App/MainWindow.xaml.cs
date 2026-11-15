@@ -42,6 +42,7 @@ public partial class MainWindow : Window
         { Notify([new(Severity.Warning, "INPUT", Path.GetFileName(path), ".unitypackageを選択してください。")]); return; }
         using var cts = new CancellationTokenSource();
         scanCancellation = cts;
+        StopImagePreview();
         report = null;
         history.Clear(); historyIndex = -1; UpdateNavigation();
         PackageTree.Items.Clear(); fileNodes.Clear();
@@ -55,9 +56,10 @@ public partial class MainWindow : Window
         try
         {
             var limits = new ScanLimits();
+            ScanLimits limitsForReport;
             while (true)
             {
-                try { report = await Task.Run(() => new PackageReader(limits).Read(path, cts.Token)); break; }
+                try { report = await Task.Run(() => new PackageReader(limits).Read(path, cts.Token)); limitsForReport = limits; break; }
                 catch (ReadLimitExceededException ex)
                 {
                     if (cts.IsCancellationRequested) throw new OperationCanceledException(cts.Token);
@@ -69,6 +71,7 @@ public partial class MainWindow : Window
                     Status.Text = "上限を解除して再読み込み中…";
                 }
             }
+            activeLimits = limitsForReport;
             BuildTree(); Notify(report.Findings);
             Status.Text = $"{report.FileCount:N0} ファイル · " + string.Join(" / ", report.Items.Where(i => !i.IsDirectory).GroupBy(i => i.Format).Select(g => $"{g.Key} {g.Count()}"));
         }
@@ -137,7 +140,7 @@ public partial class MainWindow : Window
     private void Tree_Changed(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (PackageTree.SelectedItem is not TreeViewItem { Tag: PackageItem item })
-        { Preview.Visibility = Visibility.Collapsed; PreviewHint.Text = ""; return; }
+        { StopImagePreview(); Preview.Visibility = Visibility.Collapsed; PreviewHint.Text = ""; return; }
         ShowItem(item);
     }
     private void ShowItem(PackageItem item)
@@ -147,10 +150,12 @@ public partial class MainWindow : Window
             history.RemoveRange(historyIndex + 1, history.Count - historyIndex - 1);
             history.Add(item); historyIndex = history.Count - 1;
         }
+        StopImagePreview();
         Preview.Text = item.TextPreview ?? "";
         Preview.Visibility = item.TextPreview == null ? Visibility.Collapsed : Visibility.Visible;
         PreviewHint.Text = item.TextPreview == null ? "この形式のプレビューは未対応です。\nモデルプレビューは次段階で対応予定です。" : "";
         Status.Text = $"{item.Name} · {item.Format} · {item.SizeLabel}";
+        if (ImagePreviewDecoder.Supports(item.Path) && report != null) _ = ShowImageAsync(item, report, activeLimits);
         UpdateNavigation();
     }
     private void UpdateNavigation() { BackButton.IsEnabled = historyIndex > 0; ForwardButton.IsEnabled = historyIndex >= 0 && historyIndex < history.Count - 1; }
@@ -166,7 +171,7 @@ public partial class MainWindow : Window
     {
         if (!fileNodes.TryGetValue(item.Path, out var node)) return;
         for (var parent = ItemsControl.ItemsControlFromItemContainer(node) as TreeViewItem; parent != null; parent = ItemsControl.ItemsControlFromItemContainer(parent) as TreeViewItem) parent.IsExpanded = true;
-        node.IsSelected = true; node.BringIntoView(); ShowItem(item);
+        if (node.IsSelected) ShowItem(item); else node.IsSelected = true; node.BringIntoView();
     }
     private void Back_Click(object sender, RoutedEventArgs e) => Navigate(-1);
     private void Forward_Click(object sender, RoutedEventArgs e) => Navigate(1);
@@ -184,8 +189,9 @@ public partial class MainWindow : Window
     private void Limits_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "初期上限：パッケージ512 MiB / 展開相当1 GiB / メンバー256 MiB\n項目50,000 / アセット10,000 / 解析2分\nテキスト先頭2 MiB、全体32 MiB予算。超過後は先頭4 KiB。\nテキスト表示32,768文字。未解析部分は警告します。\n読み込み容量・件数・時間の上限に達した場合は継続を確認します。\n承認すると容量・件数・時間の上限を今回だけすべて解除し、先頭から再試行します。", "読み込み上限");
     private void Help_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "Fileから開くか、パッケージをドロップします。\nAlt＋左クリックで枝以下を一括展開・格納します。\n右側はプレビュー専用です。モデル描画は未対応です。\n異常検出時だけ下部に通知します。クリックで詳細を開きます。\n検出は静的ルールによるものです。未検出は安全性を保証しません。", "使い方");
     private void About_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
-    protected override void OnClosed(EventArgs e) { scanCancellation?.Cancel(); warningWindow?.Close(); base.OnClosed(e); }
+    protected override void OnClosed(EventArgs e) { scanCancellation?.Cancel(); StopImagePreview(); warningWindow?.Close(); base.OnClosed(e); }
 }
+
 
 
 

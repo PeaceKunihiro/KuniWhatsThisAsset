@@ -48,22 +48,15 @@ public static class SecurityScanner
         if (matches == false && !findings.Any(f => f.Code == "FORMAT_MISMATCH"))
             Add(Severity.Warning, "FORMAT_MISMATCH", "拡張子の代表的なシグネチャと一致しません。破損または偽装の可能性があります。");
         if (!IsText(path)) return (findings, null);
-        string text;
-        try
-        {
-            // A truncated sample may end inside a multibyte character; replacement is intentional.
-            text = bytes.AsSpan().StartsWith(new byte[] { 255, 254 }) ? Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2)
-                : bytes.AsSpan().StartsWith(new byte[] { 254, 255 }) ? Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2)
-                : Encoding.UTF8.GetString(bytes);
-        }
-        catch (ArgumentException) { return (findings, null); }
+        string text = TextDecoder.Decode(bytes, length > bytes.Length, out bool uncertainEncoding);
         foreach (var rule in Rules)
         {
             if (Regex.IsMatch(text, rule.Pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))
                 Add(Severity.Warning, rule.Code, rule.Message);
         }
         if (length > bytes.Length) Add(Severity.Warning, "SCAN_PARTIAL", $"テキスト解析は先頭{bytes.Length:N0}バイトのみです。残りは未解析です。");
-        if (text.Contains('\ufffd')) Add(Severity.Warning, "TEXT_ENCODING", "UTF-8/UTF-16で解釈できない文字があります。テキスト検出が不完全な可能性があります。");
+        if (uncertainEncoding) Add(Severity.Warning, "TEXT_ENCODING", "UTF-8/UTF-16/Shift-JISで解釈できない文字があります。テキスト検出が不完全な可能性があります。");
         return (findings, text.Length > 32_768 ? text[..32_768] + "\n…（表示省略）" : text);
     }
 }
+
