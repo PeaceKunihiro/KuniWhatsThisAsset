@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KuniWhatsThisAsset.App/KuniWhatsThisAsset.App.csproj" />
+    <Project Path="src/KuniWhatsThisAsset.Cli/KuniWhatsThisAsset.Cli.csproj" />
+    <Project Path="src/KuniWhatsThisAsset.Core/KuniWhatsThisAsset.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KuniWhatsThisAsset.Tests/KuniWhatsThisAsset.Tests.csproj" />
+  </Folder>
+</Solution>

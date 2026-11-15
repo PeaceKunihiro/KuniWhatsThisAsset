@@ -1,0 +1,16 @@
+.vs/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.user
+*.ipch
+ipch/
+*.pdb
+*.obj
+*.pch
+.tools/
+**/bin/
+**/obj/
+artifacts/
+.vs/
