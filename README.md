@@ -6,9 +6,9 @@ KuniWhatsThisAssetは、`.unitypackage`に含まれるファイルと危険要�
 
 ## バージョン・開発状況
 
-**v0.6.0 — ライセンス表示対応版**
+**v0.7.0 — 更新確認対応版**
 
-パッケージの読み込み、内容物一覧、ルールによる静的な危険要素検出を実装しました。モデルプレビュー・用途推定は未対応です。参考画像に沿って大きくUIを変更したため、バージョン管理規則に従いv0.6.0としています。
+パッケージの読み込み、内容物一覧、ルールによる静的な危険要素検出を実装しました。モデルプレビュー・用途推定は未対応です。更新確認機能を追加したため、バージョン管理規則に従いv0.7.0としています。
 
 ## 使い方
 
@@ -24,6 +24,14 @@ KuniWhatsThisAssetは、`.unitypackage`に含まれるファイルと危険要�
 ```powershell
 .\KuniWhatsThisAsset.App.exe "D:\Assets\sample.unitypackage"
 ```
+
+## 更新確認
+
+`Help → バージョン情報`を開いたとき、PCの現地日付ごとに1回、[GitHubのStable](https://github.com/PeaceKunihiro/KuniWhatsThisAsset/tree/master/Stable)を確認します。最新版が現在版より新しい場合は、ダイアログ内に最新版番号とダウンロードボタンを表示します。ダウンロードはユーザー操作で既定ブラウザを開く方式です。
+
+同日確認済み・接続不能・更新なしの場合は、追加の更新通知やエラーダイアログを出さず、Stableへのリンクだけを表示します。既存のアイコンと現在版の表示は維持します。失敗した試行も当日の回数に含み、状態を`%LOCALAPPDATA%/KuniWhatsThisAsset/update-check.json`へ保存して、再起動や同時起動でも再確認を抑えます。状態の保存・読み取りに問題がある場合も通信せずリンク表示とします。
+
+通信は確認用APIへの最大5秒・自動再試行なしです。パッケージの内容を送信しません。アプリ起動時やパッケージ読み込み時には確認せず、自動ダウンロード・展開・本体置換も行いません。手動でStableを開く操作は、アプリの1日1回の確認制限とは別です。
 
 ## バージョン管理規則
 
@@ -160,7 +168,7 @@ dotnet run --project src/KuniWhatsThisAsset.App -c Release --no-build
 次のコマンドはランタイムパックの取得にネットワーク接続を使用します。出力先はGit管理対象外です。
 
 ```powershell
-dotnet publish src/KuniWhatsThisAsset.App -c Release -r win-x64 --self-contained true --source https://api.nuget.org/v3/index.json -o artifacts/KuniWhatsThisAsset-v0.6.0-win-x64
+dotnet publish src/KuniWhatsThisAsset.App -c Release -r win-x64 --self-contained true --source https://api.nuget.org/v3/index.json -o artifacts/KuniWhatsThisAsset-v0.7.0-win-x64
 ```
 
 配布時には.NETランタイムのライセンスと第三者通知も同梱してください。詳細は[技術選定・依存関係](Documents/Development.md)を参照してください。
@@ -188,6 +196,7 @@ dotnet run --project src/KuniWhatsThisAsset.Cli -c Release --no-build -- "D:\Ass
 
 
 本プロジェクトのライセンスは未定です。.NET等の依存コンポーネントにはそれぞれのライセンスが適用されます。公開配布時のプロジェクトライセンスは決定後に明記します。
+
 
 
 

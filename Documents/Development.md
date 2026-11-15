@@ -82,3 +82,7 @@ WPF検証で形式別の復号と破損拒否、パッケージを作成して�
 ## v0.6.0 ライセンス表示
 
 Help→ライセンスで、src/KuniWhatsThisAsset.App/Licenses/の原文をEmbeddedResourceから読み取って表示する。同じソース文書をContentとして出力・発行先のlicenses/へコピーし、表示内容と配布物の不一致を防ぐ。今回収録した文書は.NET 10.0.15のRuntime・WindowsDesktopランタイムパック由来のライセンス・第三者通知、および取得済みWindows .NET SDKの.NET Libraryライセンス。依存やランタイムの更新時には対象バージョンの文書を再確認する。
+
+## v0.7.0 更新確認
+
+追加パッケージなしでHttpClient・System.Text.Json・ファイル排他を使用する。更新確認は指定GitHubに対するユーザー起点の通信で、パッケージ解析の外部送信禁止と区別する。状態保存はLocalApplicationData配下、レスポンス制限は1 MiB/1,000項目、タイムアウト5秒、自動再試行・リダイレクト追跡なし。ダウンロード先は固定したリポジトリのraw URLと完全一致する候補に限定する。詳細と検証範囲はUpdateCheckPlan.md。

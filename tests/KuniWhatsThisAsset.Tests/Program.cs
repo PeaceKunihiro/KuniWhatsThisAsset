@@ -216,8 +216,78 @@ Test("full selected asset read beyond sample budget and input cap", () =>
     Reject(() => reader.ReadAssetBytes(file, guid, maxBytes: 1024));
     Reject(() => reader.ReadAssetBytes(Path.Combine(output, "bad-crc.unitypackage"), guid));
 });
+Test("update candidate numeric ordering and URL allowlist", () =>
+{
+    string JsonEntry(string version, string suffix = "win-x64.zip", bool evil = false) => System.Text.Json.JsonSerializer.Serialize(new {
+        name = "KuniWhatsThisAsset-v" + version + "-" + suffix, type = "file",
+        download_url = evil ? "https://example.invalid/run.exe" : "https://raw.githubusercontent.com/PeaceKunihiro/KuniWhatsThisAsset/master/Stable/KuniWhatsThisAsset-v" + version + "-" + suffix });
+    byte[] json = Utf8("[" + string.Join(",", JsonEntry("0.9.0"), JsonEntry("0.10.0"), JsonEntry("0.99.0", evil: true), JsonEntry("9.0.0", "win-arm64.zip"), JsonEntry("9.0.0-beta")) + "]");
+    Check(UpdateChecker.FindLatest(json, new Version(0, 8, 0))?.Version == new Version(0, 10, 0), "Not numeric latest");
+    Check(UpdateChecker.FindLatest(json, new Version(0, 10, 0)) == null, "Same/older should not notify");
+    Check(UpdateChecker.FindLatest(Utf8("{}"), new Version(0, 1, 0)) == null, "Wrong root accepted");
+});
+Test("update attempt persists across instances and day changes", () =>
+{
+    string file = Path.Combine(output, "update-" + Guid.NewGuid() + ".json");
+    var now = new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.FromHours(9));
+    Check(new FileUpdateAttemptStore(file).TryReserve(now), "First attempt blocked");
+    Check(!new FileUpdateAttemptStore(file).TryReserve(now.AddHours(1)), "Same day allowed");
+    Check(new FileUpdateAttemptStore(file).TryReserve(now.AddDays(1)), "Next day blocked");
+    Check(!new FileUpdateAttemptStore(file).TryReserve(now), "Clock rollback allowed");
+    File.WriteAllText(file, "broken");
+    Check(!new FileUpdateAttemptStore(file).TryReserve(now.AddDays(2)), "Corrupt state should suppress request");
+    File.WriteAllText(file, "");
+    Check(!new FileUpdateAttemptStore(file).TryReserve(now), "Empty prior state accepted");
+});
+Test("failed update counts for day; next day can find update", () =>
+{
+    string file = Path.Combine(output, "update-" + Guid.NewGuid() + ".json");
+    var now = new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.FromHours(9));
+    int calls = 0;
+    using var handler = new FakeUpdateHandler((request, token) =>
+    {
+        Check(request.RequestUri == UpdateChecker.ApiUri && request.Headers.Authorization == null && request.Headers.UserAgent.Count > 0, "Unexpected request");
+        calls++;
+        return Task.FromResult(calls == 1 ? new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable) :
+            new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("[{\"type\":\"file\",\"name\":\"KuniWhatsThisAsset-v1.0.0-win-x64.zip\",\"download_url\":\"https://raw.githubusercontent.com/PeaceKunihiro/KuniWhatsThisAsset/master/Stable/KuniWhatsThisAsset-v1.0.0-win-x64.zip\"}]") });
+    });
+    using var client = new System.Net.Http.HttpClient(handler);
+    var checker = new UpdateChecker(client, new FileUpdateAttemptStore(file), () => now);
+    Check(checker.CheckAsync(new Version(0, 7, 0)).GetAwaiter().GetResult() == null, "Failure not quiet");
+    Check(checker.CheckAsync(new Version(0, 7, 0)).GetAwaiter().GetResult() == null && calls == 1, "Failure retried same day");
+    now = now.AddDays(1);
+    Check(checker.CheckAsync(new Version(0, 7, 0)).GetAwaiter().GetResult()?.Version == new Version(1, 0, 0) && calls == 2, "Next day request failed");
+});
+Test("update invalid JSON, connection failure and cancellation are quiet", () =>
+{
+    foreach (int mode in new[] { 0, 1, 2 })
+    {
+        string file = Path.Combine(output, "update-" + Guid.NewGuid() + ".json");
+        using var handler = new FakeUpdateHandler((_, token) => mode switch {
+            0 => Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new System.Net.Http.StringContent("broken") }),
+            1 => Task.FromException<System.Net.Http.HttpResponseMessage>(new System.Net.Http.HttpRequestException("offline")),
+            _ => Task.FromCanceled<System.Net.Http.HttpResponseMessage>(new CancellationToken(true)) });
+        using var client = new System.Net.Http.HttpClient(handler);
+        var checker = new UpdateChecker(client, new FileUpdateAttemptStore(file));
+        Check(checker.CheckAsync(new Version(0, 7, 0)).GetAwaiter().GetResult() == null, "Failure escaped");
+    }
+});
+Test("concurrent update checks reserve only one request", () =>
+{
+    string file = Path.Combine(output, "update-" + Guid.NewGuid() + ".json");
+    int calls = 0;
+    using var handler = new FakeUpdateHandler(async (_, token) => { Interlocked.Increment(ref calls); await Task.Delay(20, token); return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Forbidden); });
+    using var client = new System.Net.Http.HttpClient(handler);
+    Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() => new UpdateChecker(client, new FileUpdateAttemptStore(file)).CheckAsync(new Version(0, 7, 0))))).GetAwaiter().GetResult();
+    Check(calls == 1, "Concurrent requests sent");
+});
 Console.WriteLine($"\n{passed} passed, {failed} failed. Fixtures: {output}");
 return failed == 0 ? 0 : 1;
 
 
 
+
+internal sealed class FakeUpdateHandler(Func<System.Net.Http.HttpRequestMessage, CancellationToken, Task<System.Net.Http.HttpResponseMessage>> callback) : System.Net.Http.HttpMessageHandler
+{
+    protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken) => callback(request, cancellationToken);
+}

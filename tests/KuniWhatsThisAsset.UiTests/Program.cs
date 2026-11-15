@@ -115,6 +115,27 @@ internal static class Program
             }
             licenseWindow.Close();
             Console.WriteLine("PASS embedded license originals, dialog selection and read-only display");
+            string updateState = System.IO.Path.GetFullPath("artifacts/test-packages/ui-update-" + Guid.NewGuid() + ".json");
+            int updateRequests = 0;
+            using var updateClient = new System.Net.Http.HttpClient(new UiUpdateHandler(() => updateRequests++));
+            var checker = new UpdateChecker(updateClient, new FileUpdateAttemptStore(updateState));
+            var about = new AboutWindow(checker, new Version(0, 7, 0)) { Owner = main };
+            about.Show(); about.UpdateLayout();
+            var updatePanel = (StackPanel)about.FindName("UpdatePanel");
+            var updateFrame = new System.Windows.Threading.DispatcherFrame();
+            var updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+            var updateStart = DateTime.UtcNow;
+            updateTimer.Tick += (_, _) => { if (updatePanel.Visibility == Visibility.Visible || DateTime.UtcNow - updateStart > TimeSpan.FromSeconds(2)) updateFrame.Continue = false; };
+            updateTimer.Start(); System.Windows.Threading.Dispatcher.PushFrame(updateFrame); updateTimer.Stop();
+            Check(updatePanel.Visibility == Visibility.Visible && updateRequests == 1, "Update notification not shown");
+            Check(((TextBlock)about.FindName("UpdateMessage")).Text.Contains("0.8.0"), "Wrong update version shown");
+            Check(about.FindName("StableLink") != null, "Stable link missing");
+            about.Close();
+            var secondAbout = new AboutWindow(checker, new Version(0, 7, 0)) { Owner = main };
+            secondAbout.Show(); secondAbout.UpdateLayout();
+            Check(((StackPanel)secondAbout.FindName("UpdatePanel")).Visibility == Visibility.Collapsed && updateRequests == 1 && secondAbout.FindName("StableLink") != null, "Same-day dialog retried or notified");
+            secondAbout.Close();
+            Console.WriteLine("PASS About dialog new update display and same-day link-only fallback (mock HTTP)");
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -125,3 +146,15 @@ internal static class Program
 
 
 
+
+internal sealed class UiUpdateHandler(Action onRequest) : System.Net.Http.HttpMessageHandler
+{
+    protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        onRequest();
+        return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new System.Net.Http.StringContent("[{\"type\":\"file\",\"name\":\"KuniWhatsThisAsset-v0.8.0-win-x64.zip\",\"download_url\":\"https://raw.githubusercontent.com/PeaceKunihiro/KuniWhatsThisAsset/master/Stable/KuniWhatsThisAsset-v0.8.0-win-x64.zip\"}]")
+        });
+    }
+}
