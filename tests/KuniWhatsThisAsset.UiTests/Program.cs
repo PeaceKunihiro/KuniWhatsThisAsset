@@ -9,6 +9,7 @@ internal static class Program
     [STAThread]
     private static int Main()
     {
+        if (Environment.GetCommandLineArgs().Contains("--real-models")) return RealModelChecks.Run();
         var app = new App(); app.InitializeComponent();
         var main = new MainWindow();
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
@@ -102,7 +103,7 @@ internal static class Program
             Check(imageView.Source == null && imageView.Visibility == Visibility.Collapsed && Field<TextBox>("Preview").Text == "説明文", "Switch from image to text failed");
             Console.WriteLine("PASS package selection -> image preview -> text selection");
             var licenses = LicenseWindow.LoadLicenses();
-            Check(licenses.Count == 5 && licenses.All(l => l.Text.Length > 100), "License text missing");
+            Check(licenses.Count == 6 && licenses.All(l => l.Text.Length > 100), "License text missing");
             Check(licenses.Any(l => l.Text.Contains("MICROSOFT SOFTWARE LICENSE TERMS")), "Distribution license missing");
             var licenseWindow = new LicenseWindow { Owner = main };
             licenseWindow.Show();
@@ -136,6 +137,127 @@ internal static class Program
             Check(((StackPanel)secondAbout.FindName("UpdatePanel")).Visibility == Visibility.Collapsed && updateRequests == 1 && secondAbout.FindName("StableLink") != null, "Same-day dialog retried or notified");
             secondAbout.Close();
             Console.WriteLine("PASS About dialog new update display and same-day link-only fallback (mock HTTP)");
+            var objBytes = System.Text.Encoding.UTF8.GetBytes("v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n");
+            var modelInput = new ModelInput("Assets/triangle.obj", objBytes, new Dictionary<string, byte[]>());
+            var imported = ModelImporter.Import(modelInput);
+            Check(imported.Statistics.TriangleCount == 1 && imported.Statistics.VertexCount == 3, "OBJ statistics wrong");
+            var modelView = new ModelViewport { Width = 400, Height = 350 };
+            modelView.SetModel(imported);
+            Check(imported.Meshes[0].Positions.Max() == 1, "OBJ positions wrong");
+            var workerModel = ModelWorker.ImportAsync(modelInput, CancellationToken.None).GetAwaiter().GetResult();
+            Check(workerModel.Statistics.TriangleCount == 1, "Child process import failed");
+            Console.WriteLine("PASS native OBJ import, WPF geometry and isolated worker roundtrip");
+            var materialObj = new System.Text.StringBuilder("mtllib many.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\n");
+            var materialMtl = new System.Text.StringBuilder();
+            for (int i = 0; i < 10; i++) { materialObj.Append($"usemtl material{i}\nf 1 2 3\n"); materialMtl.Append($"newmtl material{i}\nKd 0.6 0.4 0.3\n"); }
+            var materialsModel = ModelImporter.Import(new("Assets/many.obj", System.Text.Encoding.UTF8.GetBytes(materialObj.ToString()), new Dictionary<string, byte[]> { ["Assets/many.mtl"] = System.Text.Encoding.UTF8.GetBytes(materialMtl.ToString()) }));
+            Check(materialsModel.Statistics.MaterialCount == 10 && materialsModel.Statistics.RequiresLoadWarning, "10 imported materials did not warn");
+            var referenced = ModelImporter.Import(modelInput with { ReferencedMaterialCount = 10 });
+            Check(referenced.Statistics.MaterialCount == 10 && referenced.Statistics.RequiresLoadWarning, "Unity material references did not warn");
+            using (var virtualIO = new VirtualModelIO(modelInput))
+            {
+                foreach (string forbidden in new[] { "C:/private/model.mtl", "https://example.invalid/x", "//server/share/a", "../../outside" })
+                    Check(virtualIO.OpenFile(forbidden, SharpAssimp.FileIOMode.ReadBinary) == null, "External reference accepted");
+            }
+            var exportScene = new SharpAssimp.Scene { RootNode = new SharpAssimp.Node("root") };
+            var movedNode = new SharpAssimp.Node("translated", exportScene.RootNode) { Transform = System.Numerics.Matrix4x4.Transpose(System.Numerics.Matrix4x4.CreateTranslation(5, 0, 0)) };
+            exportScene.RootNode.Children.Add(movedNode);
+            var exportMesh = new SharpAssimp.Mesh(SharpAssimp.PrimitiveType.Triangle) { MaterialIndex = 0 };
+            exportMesh.Vertices.AddRange(new[] { new System.Numerics.Vector3(0,0,0), new System.Numerics.Vector3(1,0,0), new System.Numerics.Vector3(0,1,0) });
+            exportMesh.Faces.Add(new SharpAssimp.Face(new[] { 0, 1, 2 }));
+            exportScene.Meshes.Add(exportMesh); exportScene.Materials.Add(new SharpAssimp.Material()); movedNode.MeshIndices.Add(0);
+            using (var exporter = new SharpAssimp.AssimpContext())
+            {
+                foreach (string format in new[] { "fbx", "fbxa" })
+                {
+                    var fbxBytes = exporter.ExportToBlob(exportScene, format)?.Data ?? throw new Exception("FBX fixture export failed");
+                    Check(fbxBytes.Length > 0, "FBX fixture export failed");
+                    System.IO.File.WriteAllBytes("artifacts/test-packages/triangle-" + format + ".fbx", fbxBytes);
+                    var fbx = ModelImporter.Import(new("Assets/model.fbx", fbxBytes, new Dictionary<string, byte[]>()));
+                    Check(fbx.Statistics.TriangleCount == 1, "FBX import failed: " + format);
+                    Check(Math.Abs(fbx.Meshes[0].Positions[0] - 5) < .01f, "FBX node translation incorrect: " + format + " x=" + fbx.Meshes[0].Positions[0]);
+                }
+            }
+            Console.WriteLine("PASS material threshold, Unity references, external IO refusal, Binary/ASCII FBX with node transforms");
+            string modelPackage = System.IO.Path.GetFullPath("artifacts/test-packages/ui-model.unitypackage");
+            string modelGuid = new string('e', 32);
+            void WriteModelPackage(byte[] asset, string? mtl = null, int materialReferences = 0)
+            {
+                using var fs = System.IO.File.Create(modelPackage);
+                using var zip = new System.IO.Compression.GZipStream(fs, System.IO.Compression.CompressionLevel.Fastest);
+                using var tar = new System.Formats.Tar.TarWriter(zip, System.Formats.Tar.TarEntryFormat.Ustar);
+                string metadata = "fileFormatVersion: 2\n" + string.Join("\n", Enumerable.Range(1, materialReferences).Select(n => "  second: {fileID: 2100000, guid: " + n.ToString("x32") + ", type: 2}"));
+                if (mtl != null)
+                {
+                    foreach (var entry in new[] { ("asset", mtl), ("pathname", "Assets/many.mtl"), ("asset.meta", "fileFormatVersion: 2\n") })
+                    {
+                        using var content = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(entry.Item2));
+                        tar.WriteEntry(new System.Formats.Tar.UstarTarEntry(System.Formats.Tar.TarEntryType.RegularFile, new string('f', 32) + "/" + entry.Item1) { DataStream = content });
+                    }
+                }
+                foreach (var member in new[] { ("asset", asset), ("pathname", System.Text.Encoding.UTF8.GetBytes("Assets/model.obj")), ("asset.meta", System.Text.Encoding.UTF8.GetBytes(metadata)) })
+                {
+                    using var stream = new System.IO.MemoryStream(member.Item2);
+                    tar.WriteEntry(new System.Formats.Tar.UstarTarEntry(System.Formats.Tar.TarEntryType.RegularFile, modelGuid + "/" + member.Item1) { DataStream = stream });
+                }
+            }
+            void PumpTask(Task task)
+            {
+                var waitFrame = new System.Windows.Threading.DispatcherFrame();
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                var waitTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+                waitTimer.Tick += (_, _) => { if (task.IsCompleted || clock.Elapsed > TimeSpan.FromSeconds(20)) waitFrame.Continue = false; };
+                waitTimer.Start(); System.Windows.Threading.Dispatcher.PushFrame(waitFrame); waitTimer.Stop();
+                Check(task.IsCompleted, "Model preview timed out"); task.GetAwaiter().GetResult();
+            }
+            WriteModelPackage(objBytes);
+            var modelReport = new PackageReader().Read(modelPackage);
+            Invoke("StopModelPreview");
+            var modelTask = (Task)Invoke("ShowModelAsync", modelReport.Items[0], modelReport, new ScanLimits(), new Func<ModelStatistics, bool>(_ => throw new Exception("Low model prompted")))!;
+            PumpTask(modelTask);
+            Check(Field<ModelViewport>("ModelView").Visibility == Visibility.Visible, "Package model not displayed");
+            Invoke("StopModelPreview");
+            byte[] highObj = System.Text.Encoding.UTF8.GetBytes("v 0 0 0\nv 1 0 0\nv 0 1 0\n" + string.Concat(Enumerable.Repeat("f 1 2 3\n", 100000)));
+            WriteModelPackage(highObj);
+            var highReport = new PackageReader().Read(modelPackage);
+            int renderWarnings = 0;
+            var highTask = (Task)Invoke("ShowModelAsync", highReport.Items[0], highReport, new ScanLimits(), new Func<ModelStatistics, bool>(s => { Check(s.TriangleCount == 100000, "Wrong polygon count in warning"); renderWarnings++; return false; }))!;
+            PumpTask(highTask);
+            Check(renderWarnings == 1 && Field<ModelViewport>("ModelView").Visibility == Visibility.Collapsed, "Declined high model rendered");
+            Check(Field<TextBlock>("PreviewHint").Text.Contains("中止"), "Decline not reflected");
+            Console.WriteLine("PASS package model preview and 100000-triangle warning before rendering with decline");
+            bool corruptModelRejected = false;
+            try { ModelWorker.ImportAsync(new("Assets/bad.fbx", new byte[] {1,2,3}, new Dictionary<string, byte[]>()), CancellationToken.None).GetAwaiter().GetResult(); }
+            catch (System.IO.InvalidDataException) { corruptModelRejected = true; }
+            Check(corruptModelRejected, "Broken model not rejected by worker");
+            var unicodeObj = ModelImporter.Import(modelInput with { Path = "Assets/モデル.obj" });
+            Check(unicodeObj.Statistics.TriangleCount == 1, "Japanese model path failed");
+            Console.WriteLine("PASS corrupt model worker refusal and Japanese virtual model path");
+            Console.WriteLine("Assimp native: " + SharpAssimp.Unmanaged.AssimpLibrary.Instance.GetVersion());
+            Invoke("StopModelPreview");
+            WriteModelPackage(System.Text.Encoding.UTF8.GetBytes(materialObj.ToString()), materialMtl.ToString());
+            var matReport = new PackageReader().Read(modelPackage);
+            var modelItem = matReport.Items.Single(i => i.Format == ".obj");
+            int materialPrompts = 0;
+            var matTask = (Task)Invoke("ShowModelAsync", modelItem, matReport, new ScanLimits(), new Func<ModelStatistics, bool>(s => { Check(s.MaterialCount == 10, "Incorrect material threshold"); materialPrompts++; return true; }))!;
+            PumpTask(matTask);
+            Check(materialPrompts == 1 && Field<ModelViewport>("ModelView").Visibility == Visibility.Visible, "Approved 10-material model did not render");
+            main.UpdateLayout();
+            var renderedView = Field<ModelViewport>("ModelView");
+            var previewCapture = new System.Windows.Media.Imaging.RenderTargetBitmap(Math.Max(1, (int)renderedView.ActualWidth), Math.Max(1, (int)renderedView.ActualHeight), 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+            previewCapture.Render(renderedView);
+            var previewEncoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            previewEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(previewCapture));
+            using (var captureFile = System.IO.File.Create("artifacts/model-preview-check.png")) previewEncoder.Save(captureFile);
+            Invoke("StopModelPreview");
+            WriteModelPackage(objBytes, materialReferences: 10);
+            var metaReport = new PackageReader().Read(modelPackage);
+            int metaPrompts = 0;
+            var metaTask = (Task)Invoke("ShowModelAsync", metaReport.Items[0], metaReport, new ScanLimits(), new Func<ModelStatistics, bool>(s => { Check(s.MaterialCount == 10 && s.TriangleCount == 1, "Unity material refs not counted"); metaPrompts++; return false; }))!;
+            PumpTask(metaTask);
+            Check(metaPrompts == 1 && Field<ModelViewport>("ModelView").Visibility == Visibility.Collapsed, "Declined Unity-material model rendered");
+            Console.WriteLine("PASS package MTL pre-render warning with approval and Unity meta references with refusal");
+            ModelMaterialChecks.Run();
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -158,3 +280,12 @@ internal sealed class UiUpdateHandler(Action onRequest) : System.Net.Http.HttpMe
         });
     }
 }
+
+
+
+
+
+
+
+
+

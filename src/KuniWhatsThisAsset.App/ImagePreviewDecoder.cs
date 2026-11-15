@@ -23,8 +23,8 @@ public static class ImagePreviewDecoder
         };
         var frame = decoder.Frames[0];
         int width = frame.PixelWidth, height = frame.PixelHeight;
-        if (width <= 0 || height <= 0 || width > 16384 || height > 16384 || (long)width * height > 16_000_000)
-            throw new InvalidDataException("画像プレビューの寸法上限（各辺16,384・合計1,600万画素）を超えています。");
+        if (width <= 0 || height <= 0 || width > 16384 || height > 16384 || (long)width * height > 16_777_216)
+            throw new InvalidDataException("画像プレビューの寸法上限（各辺16,384・合計16,777,216画素）を超えています。");
         var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
         int stride = checked(width * 4);
         var pixels = new byte[checked(stride * height)];
@@ -34,3 +34,4 @@ public static class ImagePreviewDecoder
         return result;
     }
 }
+

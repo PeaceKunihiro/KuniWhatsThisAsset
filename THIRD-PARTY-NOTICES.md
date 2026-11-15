@@ -1,6 +1,13 @@
 # 依存コンポーネント
 
-KuniWhatsThisAsset v0.7.0は.NET 10 / WPFを使用します。追加の外部NuGetライブラリはありません。
+KuniWhatsThisAsset v0.8.0は.NET 10 / WPFおよびSharpAssimp 6.0.12を使用します。描画は標準WPF Viewport3Dを使用します。
+
+SharpAssimpの管理コードはMIT、同梱Assimpネイティブ部分はBSD 3-Clauseです。パッケージに含まれるPoly2Tri等の通知も含めた原文を`licenses/SharpAssimp-LICENSE.txt`へ同梱し、Help→ライセンスで表示します。ソース原本はNuGet 6.0.12のLICENSE.txtです。
+
+- [SharpAssimp公式](https://github.com/JeremyAnsel/SharpAssimp)
+- [SharpAssimp 6.0.12](https://www.nuget.org/packages/SharpAssimp/6.0.12)
+
+同梱`Native/assimp.dll`の動作にはMicrosoft Visual C++ v14 x64ランタイムが必要です。VC++ランタイムは本ZIPへ同梱せず、Microsoft公式インストーラーを案内します。テスト用アバター等の第三者アセットは本配布物に含めません。
 
 自己完結型のWindows x64成果物にはMicrosoft.NETCore.AppとMicrosoft.WindowsDesktop.Appが含まれます。発行フォルダーの`licenses/`に、それぞれのランタイムパックに含まれるライセンス、および.NET Coreの第三者通知を同梱しています。配布物をコピーする際は、これらのファイルも保持してください。
 

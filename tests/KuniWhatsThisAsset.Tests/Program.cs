@@ -281,6 +281,16 @@ Test("concurrent update checks reserve only one request", () =>
     Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() => new UpdateChecker(client, new FileUpdateAttemptStore(file)).CheckAsync(new Version(0, 7, 0))))).GetAwaiter().GetResult();
     Check(calls == 1, "Concurrent requests sent");
 });
+Test("model load warning inclusive thresholds and no-render decision", () =>
+{
+    var stats = new ModelStatistics(3, 99999, 1, 9, 0, false);
+    int prompts = 0;
+    bool Refuse(ModelStatistics s) { prompts++; return false; }
+    Check(ModelRenderPolicy.Approve(stats, Refuse) && prompts == 0, "Below threshold warned");
+    Check(!ModelRenderPolicy.Approve(stats with { TriangleCount = 100000 }, Refuse) && prompts == 1, "100000 polygons did not warn");
+    Check(!ModelRenderPolicy.Approve(stats with { MaterialCount = 10 }, Refuse) && prompts == 2, "10 materials did not warn");
+    Check(ModelRenderPolicy.Approve(stats with { TriangleCount = 100001 }, _ => true), "Approval rejected");
+});
 Console.WriteLine($"\n{passed} passed, {failed} failed. Fixtures: {output}");
 return failed == 0 ? 0 : 1;
 
@@ -291,3 +301,4 @@ internal sealed class FakeUpdateHandler(Func<System.Net.Http.HttpRequestMessage,
 {
     protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellationToken) => callback(request, cancellationToken);
 }
+

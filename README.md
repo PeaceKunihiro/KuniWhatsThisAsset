@@ -6,9 +6,9 @@ KuniWhatsThisAssetは、`.unitypackage`に含まれるファイルと危険要�
 
 ## バージョン・開発状況
 
-**v0.7.0 — 更新確認対応版**
+**v0.8.0 — モデルプレビュー対応版**
 
-パッケージの読み込み、内容物一覧、ルールによる静的な危険要素検出を実装しました。モデルプレビュー・用途推定は未対応です。更新確認機能を追加したため、バージョン管理規則に従いv0.7.0としています。
+パッケージの読み込み、内容物一覧、静的な危険要素検出、画像・FBX/OBJモデルのプレビューに対応しています。新機能追加のため、バージョン管理規則に従いv0.8.0としています。用途推定は未対応です。
 
 ## 使い方
 
@@ -17,7 +17,7 @@ KuniWhatsThisAssetは、`.unitypackage`に含まれるファイルと危険要�
 3. 左側のツリーで内容を確認します。Alt＋左クリックで、その枝以下を一括展開・格納できます。
 4. ファイルを選択して右側でプレビューを確認します。異常時のみ下部に折りたたまれた通知が表示され、クリックで詳細を確認できます。
 
-発行済みフォルダーは、DLL等を含めて一式で使用してください。自己完結型のWindows x64版では.NETの別途インストールは不要です。このリポジトリに実行ファイルは含めていません。ローカルでの発行手順は下記を参照してください。
+発行済みフォルダーは、`Native/assimp.dll`や`licenses/`を含めて一式で使用してください。配布用ZIPは[Stable](https://github.com/PeaceKunihiro/KuniWhatsThisAsset/tree/master/Stable)にあります。自己完結型のWindows x64版では.NETの別途インストールは不要です。モデル解析には[Microsoft Visual C++ v14 x64ランタイム](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)が必要です。未導入の場合は[公式インストーラー](https://aka.ms/vc14/vc_redist.x64.exe)を利用してください。
 
 起動時の引数でパッケージを指定することもできます。
 
@@ -65,19 +65,30 @@ KuniWhatsThisAssetは、`.unitypackage`に含まれるファイルと危険要�
 
 ツリーで画像を選択すると、右側の領域に縦横比を保って表示します。PNG / JPEG / BMP / GIF / TIFF / ICOに対応し、GIF・TIFF・ICOは先頭フレームを表示します。TGA / DDS / PSD / SVGは未対応です。
 
-画像選択時はパッケージを再検証し、選択したアセットの完全なデータをメモリへ読み込みます。ディスク展開や外部URLへのアクセスは行いません。プレビューの入力は64 MiB、各辺16,384ピクセル、合計1,600万画素までです。この上限は読み込み継続承認とは独立した画像表示の制限です。表示できない場合はプレビュー領域に理由を表示します。
+画像選択時はパッケージを再検証し、選択したアセットの完全なデータをメモリへ読み込みます。ディスク展開や外部URLへのアクセスは行いません。プレビューの入力は64 MiB、各辺16,384ピクセル、合計16,777,216画素（4K正方形を含む）までです。この上限は読み込み継続承認とは独立した画像表示の制限です。表示できない場合はプレビュー領域に理由を表示します。
 
 ### テキストの文字コード
 
 BOMがある場合はUTF-8 / UTF-16を優先し、BOMなしでは厳密なUTF-8を試した後、失敗時にShift-JIS（Windows CP932）を試します。判定は推定であり、両方で解釈できるバイト列はUTF-8を優先します。復号したテキストは表示と危険要素検出の両方に使います。どちらでも復号できない場合は警告します。解析サンプルの末尾で切れた文字は次の文字コードへの切り替え理由にしません。
 
-## 今後の開発予定
-
 ### 2. 選択した3Dモデルのプレビュー
 
-- パッケージ内のモデルを一覧から選択して表示
-- FBX / OBJ等への対応を技術検証
-- 取得可能な範囲で頂点数、三角形数、Mesh数、Material数、Bone数、Skinned Meshの有無を表示
+ツリーでFBX（Binary / ASCII）またはOBJを選択すると静止モデルを表示します。左ドラッグで回転、右・中ドラッグまたはShift＋ドラッグで移動、ホイールでズームできます。「全体表示・正面復帰」で初期表示へ戻ります。
+
+- 頂点数、ポリゴン数（三角形換算）、Mesh数、依存Material数、Bone数、Skinの有無を表示
+- **100,000ポリゴン以上、または依存マテリアル10以上**の場合は描画前に高負荷確認。「いいえ」では描画しない
+- Unity `.fbx.meta`のマテリアル割り当て、`.mat`の主テクスチャ・色・透過マスクを読み取り、明るい簡易アニメ調照明で表示
+- 明示割り当てがない場合はモデル配下の同名`.mat`を検索し、曖昧な候補は自動選択しない
+- 対応画像形式のテクスチャを最長辺2,048へ縮小して使用。テクスチャ総画素予算は32 Mi画素。未対応・破損・予算超過の画像は単色へフォールバック
+- OBJは同じパッケージ内のMTLの基本色に対応。外部ファイル・外部URLは読み込まない
+
+Unity専用シェーダー（lilToon / arktoon等）の輪郭線・MatCap・特殊な影、Prefabの非表示設定やBlendShape値、スキニング・アニメーション・商品画像のポーズは再現しません。透過は簡易カットアウトで近似します。FBXの初期形状を表示するため、商品画像やUnity上の最終結果と差があります。
+
+ユーザー提供のFuzzy ver.2.00（32,548三角形・5材質）とLuchika ver.1.00（121,966三角形・6材質）でテクスチャ付き表示を確認しました。Luchikaは高負荷確認の対象です。モデル・テクスチャ・検証画像は配布物へ含めません。
+
+モデル解析は別プロセスで行い、60秒・約2 GiBの監視上限を設けています。入力256 MiB、200万頂点・200万三角形まで対応します。これらはパッケージ読み込み上限とは別のプレビュー上限です。プロセス分離はOSのサンドボックスではありません。
+
+## 今後の開発予定
 
 ### 3. その他の機能
 
@@ -145,11 +156,11 @@ GUIDディレクトリと`asset / asset.meta / pathname / preview.png`を基本�
 
 ## 対象環境
 
-Windows x64、.NET 10 / WPFを使用します。Unity Editorは不要です。自己完結型で発行すると.NETランタイムが同梱されます。OS別の動作確認マトリクスは未整備で、現在は開発環境上での確認です。
+Windows x64、.NET 10 / WPFを使用します。Unity Editorは不要です。自己完結型で発行すると.NETランタイムが同梱されます。モデル解析用ネイティブDLLにはMicrosoft Visual C++ v14 x64ランタイムが必要です。OS別の動作確認マトリクスは未整備で、現在は開発環境上での確認です。
 
 ## ソースからビルド
 
-Windows上に.NET 10 SDKを用意し、リポジトリのルートで実行します。初版は外部NuGetライブラリを使用しません。
+Windows上に.NET 10 SDKを用意し、リポジトリのルートで実行します。SharpAssimp 6.0.12をNuGetから取得します。描画は標準WPF Viewport3Dを使用します。
 
 ```powershell
 dotnet restore KuniWhatsThisAsset.slnx --configfile NuGet.Config
@@ -159,7 +170,7 @@ dotnet run --project tests/KuniWhatsThisAsset.UiTests -c Release --no-build
 dotnet run --project src/KuniWhatsThisAsset.App -c Release --no-build
 ```
 
-テストは外部テストフレームワーク不要のコンソール形式です。正常系と不正入力を確認し、失敗時に終了コード1を返します。生成する検証用パッケージは`artifacts/test-packages/`に保存されます。実際のUnityエクスポートによる互換性検証は今後の課題です。
+テストは外部テストフレームワーク不要のコンソール形式です。正常系と不正入力を確認し、失敗時に終了コード1を返します。生成する検証用パッケージは`artifacts/test-packages/`に保存されます。実モデル検証はローカルのユーザー提供データが必要なため通常テストには含めません。手元の指定データで再検証する場合はUIテストへ`--real-models`を渡します。
 
 ### Windows x64版の発行
 
@@ -168,7 +179,7 @@ dotnet run --project src/KuniWhatsThisAsset.App -c Release --no-build
 次のコマンドはランタイムパックの取得にネットワーク接続を使用します。出力先はGit管理対象外です。
 
 ```powershell
-dotnet publish src/KuniWhatsThisAsset.App -c Release -r win-x64 --self-contained true --source https://api.nuget.org/v3/index.json -o artifacts/KuniWhatsThisAsset-v0.7.0-win-x64
+dotnet publish src/KuniWhatsThisAsset.App -c Release -r win-x64 --self-contained true --source https://api.nuget.org/v3/index.json -o artifacts/KuniWhatsThisAsset-v0.8.0-win-x64
 ```
 
 配布時には.NETランタイムのライセンスと第三者通知も同梱してください。詳細は[技術選定・依存関係](Documents/Development.md)を参照してください。

@@ -3,14 +3,20 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <ApplicationIcon>../../IMGs/KWTA_icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="SharpAssimp" Version="6.0.12" ExcludeAssets="native" />
+    <Content Include="$(NuGetPackageRoot)sharpassimp/6.0.12/runtimes/win-x64/native/assimp.dll" Link="Native/assimp.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Licenses/*.txt" />
     <Content Include="Licenses/*.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Resource Include="../../IMGs/KWTA_icon.png" Link="Assets/KWTA_icon.png" />
     <ProjectReference Include="../KuniWhatsThisAsset.Core/KuniWhatsThisAsset.Core.csproj" />
   </ItemGroup>
 </Project>
+
+
+
 
