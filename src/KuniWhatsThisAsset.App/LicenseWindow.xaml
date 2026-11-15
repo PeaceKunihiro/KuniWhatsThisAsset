@@ -1,0 +1,11 @@
+<Window x:Class="KuniWhatsThisAsset.App.LicenseWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="ライセンス" Width="940" Height="680" MinWidth="640" MinHeight="420" WindowStartupLocation="CenterOwner" Background="#F1DDC5" Foreground="#38291E" Icon="Assets/KWTA_icon.png">
+ <DockPanel Margin="18">
+  <TextBlock DockPanel.Dock="Top" Text="ライセンス・第三者通知" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,8"/>
+  <TextBlock DockPanel.Dock="Top" Text="同梱コンポーネントのライセンス原文を表示します。対象を左から選択してください。" TextWrapping="Wrap" Margin="0,0,0,14"/>
+  <Button DockPanel.Dock="Bottom" Content="閉じる" IsCancel="True" HorizontalAlignment="Right" MinWidth="100" Margin="0,12,0,0"/>
+  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="235"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <ListBox x:Name="LicenseList" DisplayMemberPath="Title" Background="#EEDFCB" BorderBrush="#B59978" SelectionChanged="License_Selected"/>
+   <TextBox x:Name="LicenseText" Grid.Column="2" IsReadOnly="True" VerticalContentAlignment="Top" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="13" Background="#FFF5E8"/>
+  </Grid>
+ </DockPanel>
+</Window>

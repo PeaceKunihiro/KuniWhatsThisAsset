@@ -1,4 +1,4 @@
-<Window x:Class="KuniWhatsThisAsset.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="KuniWhatsThisAsset v0.5.0" Icon="Assets/KWTA_icon.png" Foreground="#38291E" Width="1100" Height="900" MinWidth="700" MinHeight="500" Background="#79604A" FontFamily="Yu Gothic UI" FontSize="14" AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver">
+<Window x:Class="KuniWhatsThisAsset.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="KuniWhatsThisAsset v0.6.0" Icon="Assets/KWTA_icon.png" Foreground="#38291E" Width="1100" Height="900" MinWidth="700" MinHeight="500" Background="#79604A" FontFamily="Yu Gothic UI" FontSize="14" AllowDrop="True" Drop="OnDrop" DragOver="OnDragOver">
  <Window.Resources>
   <Style TargetType="MenuItem"><Setter Property="Background" Value="#E6C6A2"/><Setter Property="Margin" Value="1"/><Setter Property="Padding" Value="10,3"/><Setter Property="FontSize" Value="18"/></Style>
  </Window.Resources>
@@ -7,7 +7,7 @@
    <MenuItem Header="File"><MenuItem x:Name="OpenMenu" Header="パッケージを開く…" Click="Open_Click"/><MenuItem Header="終了" Click="Exit_Click"/></MenuItem>
    <MenuItem Header="Edit"><MenuItem Header="選択した枝を一括展開" Click="Expand_Click"/><MenuItem Header="選択した枝を一括格納" Click="Collapse_Click"/></MenuItem>
    <MenuItem Header="Setting"><MenuItem Header="読み込み上限・解析範囲" Click="Limits_Click"/></MenuItem>
-   <MenuItem Header="Help"><MenuItem Header="使い方・検出の意味" Click="Help_Click"/><MenuItem Header="バージョン情報" Click="About_Click"/></MenuItem>
+   <MenuItem Header="Help"><MenuItem Header="使い方・検出の意味" Click="Help_Click"/><MenuItem Header="ライセンス" Click="Licenses_Click"/><MenuItem Header="バージョン情報" Click="About_Click"/></MenuItem>
   </Menu>
   <Grid DockPanel.Dock="Top" Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <Button x:Name="ReloadButton" Content="⟳" FontSize="23" Padding="3,0" Margin="0,0,6,0" Click="Reload_Click" ToolTip="パッケージを再読み込み"/>
@@ -37,6 +37,8 @@
    </Expander>
   </Grid> </DockPanel>
 </Window>
+
+
 
 
 

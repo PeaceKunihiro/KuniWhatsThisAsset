@@ -6,9 +6,9 @@ KuniWhatsThisAssetは、`.unitypackage`に含まれるファイルと危険要�
 
 ## バージョン・開発状況
 
-**v0.5.0 — 画像・Shift-JIS対応版**
+**v0.6.0 — ライセンス表示対応版**
 
-パッケージの読み込み、内容物一覧、ルールによる静的な危険要素検出を実装しました。モデルプレビュー・用途推定は未対応です。参考画像に沿って大きくUIを変更したため、バージョン管理規則に従いv0.5.0としています。
+パッケージの読み込み、内容物一覧、ルールによる静的な危険要素検出を実装しました。モデルプレビュー・用途推定は未対応です。参考画像に沿って大きくUIを変更したため、バージョン管理規則に従いv0.6.0としています。
 
 ## 使い方
 
@@ -160,7 +160,7 @@ dotnet run --project src/KuniWhatsThisAsset.App -c Release --no-build
 次のコマンドはランタイムパックの取得にネットワーク接続を使用します。出力先はGit管理対象外です。
 
 ```powershell
-dotnet publish src/KuniWhatsThisAsset.App -c Release -r win-x64 --self-contained true --source https://api.nuget.org/v3/index.json -o artifacts/KuniWhatsThisAsset-v0.5.0-win-x64
+dotnet publish src/KuniWhatsThisAsset.App -c Release -r win-x64 --self-contained true --source https://api.nuget.org/v3/index.json -o artifacts/KuniWhatsThisAsset-v0.6.0-win-x64
 ```
 
 配布時には.NETランタイムのライセンスと第三者通知も同梱してください。詳細は[技術選定・依存関係](Documents/Development.md)を参照してください。
@@ -184,7 +184,11 @@ dotnet run --project src/KuniWhatsThisAsset.Cli -c Release --no-build -- "D:\Ass
 
 ## ライセンス
 
+アプリのHelp → ライセンスから、同梱コンポーネントのライセンス原文と第三者通知を別ダイアログで確認できます。文書は本体にも埋め込み、配布フォルダーのlicenses/にも保持します。ライブラリを追加・更新する際は、表示内容と同梱文書を併せて更新します。
+
+
 本プロジェクトのライセンスは未定です。.NET等の依存コンポーネントにはそれぞれのライセンスが適用されます。公開配布時のプロジェクトライセンスは決定後に明記します。
+
 
 
 

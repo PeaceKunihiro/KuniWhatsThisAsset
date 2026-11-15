@@ -101,12 +101,27 @@ internal static class Program
             Invoke("ShowItem", new PackageItem("text", "Assets/test.txt", 4, false, Array.Empty<Finding>(), "説明文"));
             Check(imageView.Source == null && imageView.Visibility == Visibility.Collapsed && Field<TextBox>("Preview").Text == "説明文", "Switch from image to text failed");
             Console.WriteLine("PASS package selection -> image preview -> text selection");
+            var licenses = LicenseWindow.LoadLicenses();
+            Check(licenses.Count == 5 && licenses.All(l => l.Text.Length > 100), "License text missing");
+            Check(licenses.Any(l => l.Text.Contains("MICROSOFT SOFTWARE LICENSE TERMS")), "Distribution license missing");
+            var licenseWindow = new LicenseWindow { Owner = main };
+            licenseWindow.Show();
+            var list = (ListBox)licenseWindow.FindName("LicenseList");
+            var licenseText = (TextBox)licenseWindow.FindName("LicenseText");
+            for (int i = 0; i < licenses.Count; i++)
+            {
+                list.SelectedIndex = i;
+                Check(licenseText.Text == licenses[i].Text && licenseText.IsReadOnly, "License dialog text mismatch");
+            }
+            licenseWindow.Close();
+            Console.WriteLine("PASS embedded license originals, dialog selection and read-only display");
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
         finally { main.Close(); app.Shutdown(); }
     }
 }
+
 
 
 

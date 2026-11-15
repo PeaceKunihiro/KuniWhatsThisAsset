@@ -7,7 +7,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Licenses/*.txt" />
+    <Content Include="Licenses/*.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Resource Include="../../IMGs/KWTA_icon.png" Link="Assets/KWTA_icon.png" />
     <ProjectReference Include="../KuniWhatsThisAsset.Core/KuniWhatsThisAsset.Core.csproj" />
   </ItemGroup>
 </Project>
+
