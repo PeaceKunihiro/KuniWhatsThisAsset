@@ -1,14 +1,12 @@
-現在の作業：v0.8.0（2026-11-16）
-- FBX/OBJ静止モデル表示を実装。SharpAssimp 6.0.12＋標準WPF Viewport3D。
-- 100,000三角形以上 OR 依存材質10以上は描画前確認。承認前はシーン未生成。
-- Unity meta/material GUID参照、主テクスチャ、色、透過マスク、明るいアニメ調近似照明。
-- 別worker、メモリ内IO、外部参照制限、60秒・約2 GiB監視。OSサンドボックスではない。
-- 指定テストデータFuzzy ver.2.00とLuchika ver.1.00で実描画を確認。
-- Fuzzy：32,548三角形・5材質。Luchika：121,966三角形・6材質（警告対象）。
-- Core 48件とWPF UIテスト成功。material GUID/画像色/透過maskの合成fixtureも検証。
-- 画像入力16,777,216画素、モデルテクスチャ最長辺2,048・総32 Mi画素。
-- Unity専用Shader、Prefab設定、アニメーション、商品画像のポーズは完全再現しない。
-- SharpAssimpライセンス同梱・Help表示。モデル解析にはVC++ v14 x64ランタイムが必要。
-- ユーザー提供アセットと検証画像はartifacts/のみ。ソース・Stableに含めない。
-完了：自己完結型publish、配布workerスモーク検証、Stable ZIP/SHA256作成・ライセンスとテストデータ非混入確認。次段階：専用Shader・Prefab設定など再現範囲の拡張。
+現在の作業：v0.9.0（2026-11-16）
+- Prefabのテキスト解析・静止近似表示を追加。直接Rendererの有効/非表示、Mesh ID/名前、材質参照を反映。
+- FBXインスタンス・入れ子Prefabを辿る。参照循環・階層/件数上限あり。FBXインスタンス差分・配置変更・Bone姿勢等の未反映は画面へ明記。
+- Fuzzy/Luchikaの実Prefabでテクスチャ表示、正面/側面/平面の透過PNG生成を確認。
+- 1024px正投影PNG三枚をLocalApplicationData/KuniWhatsThisAsset/RenderCacheへ保存。再選択ではキャッシュ写真、3D表示ボタンから再描画。
+- キャッシュキーはパッケージ全体SHA256・選択GUID・描画改訂版。容量超過時はLRU削除。破損は再生成。書き込み失敗はモデル表示を維持。
+- Setting→読み込み設定タブにパッケージ/キャッシュ容量（各500 MiB）、整数入力・増減ボタン・無制限を追加。
+- アドレスバーの履歴10件、★のシングル追加/ダブル削除/右クリック一覧。実フォルダー単位でブックマーク。
+- 設定・履歴はpreferences.jsonに保存。テストはartifacts配下の独立プロファイルを使用。
+- Core 53件とWPF Prefab/透過キャッシュ/再表示検証が成功。
+完了：設定・ナビゲーションUI、キャッシュ/Prefab検証、説明書更新、ビルド警告0・エラー0、自己完結型workerスモーク、Stable ZIP/SHA256・ライセンス/ユーザーデータ非混入確認。次段階：Prefab変換差分、Bone姿勢、BlendShape等の再現範囲拡張。
 

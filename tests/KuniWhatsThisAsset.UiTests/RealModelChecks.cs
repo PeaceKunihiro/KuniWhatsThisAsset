@@ -35,6 +35,16 @@ internal static class RealModelChecks
                 using (var output = File.Create("artifacts/" + name + "-render.png")) encoder.Save(output);
                 window.Close();
                 Console.WriteLine(name + ": " + JsonSerializer.Serialize(data.Statistics));
+                string prefabPath = name == "Fuzzy" ? "Assets/Avatar_Fuzzy/Fuzzy.prefab" : "Assets/KOYORI LABO/Avatar_Luchika/Luchika.prefab";
+                var prefabItem = report.Items.Single(i => i.Path == prefabPath);
+                var prefabTask = Task.Run(() => PrefabPreviewBuilder.BuildAsync(reader, report, prefabItem, CancellationToken.None)); FeatureChecks.Pump(prefabTask);
+                var prefab = prefabTask.Result;
+                var prefabMaterials = ModelMaterials.Load(reader, report, prefabItem, prefab.MaterialMetadata, prefab.Model, CancellationToken.None);
+                view.SetModel(prefab.Model, prefabMaterials);
+                var photos = view.CaptureViews();
+                for (int index = 0; index < 3; index++) File.WriteAllBytes("artifacts/" + name + "-prefab-" + RenderCache.Views[index] + ".png", photos[index]);
+                File.WriteAllText("artifacts/" + name + "-prefab-info.json", JsonSerializer.Serialize(new { prefab.Model.Statistics, prefab.Model.Notes }, new JsonSerializerOptions { WriteIndented = true }));
+                Console.WriteLine(name + " Prefab: " + JsonSerializer.Serialize(prefab.Model.Statistics) + " textures=" + prefabMaterials.Count);
             }
             return 0;
         }

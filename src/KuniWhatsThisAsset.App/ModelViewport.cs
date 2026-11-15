@@ -3,6 +3,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
+using System.Windows.Media.Imaging;
+using System.IO;
 using KuniWhatsThisAsset.Core;
 
 namespace KuniWhatsThisAsset.App;
@@ -14,12 +16,25 @@ public sealed class ModelViewport : Grid
     private Point last;
     private double yaw = .5, pitch = .15, distance = 4;
     private Vector3D pan;
+    private Model3DGroup? scene;
+    private readonly DockPanel gallery = new() { Visibility = Visibility.Collapsed };
+    private readonly Image cachedPicture = new() { Stretch = Stretch.Uniform, Margin = new Thickness(12, 4, 12, 90) };
+    private readonly Button reset;
+    private BitmapSource[] pictures = [];
+    private Action? reopen;
     public ModelViewport()
     {
         Background = new SolidColorBrush(Color.FromRgb(238, 223, 203));
         viewport.Camera = camera; Children.Add(viewport); Children.Add(info);
-        var reset = new Button { Content = "全体表示・正面復帰", HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(8), Padding = new Thickness(8, 3, 8, 3) };
+        reset = new Button { Content = "全体表示・正面復帰", HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(8), Padding = new Thickness(8, 3, 8, 3) };
         reset.Click += (_, _) => Reset(); Children.Add(reset);
+        var controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(8) };
+        foreach (var (label, index) in new[] { ("正面", 0), ("側面", 1), ("平面", 2) })
+        {
+            var button = new Button { Content = label, Padding = new Thickness(12, 3, 12, 3), Margin = new Thickness(3) }; button.Click += (_, _) => { if (pictures.Length == 3) cachedPicture.Source = pictures[index]; }; controls.Children.Add(button);
+        }
+        var open = new Button { Content = "3D表示", Padding = new Thickness(12, 3, 12, 3), Margin = new Thickness(12, 3, 3, 3) }; open.Click += (_, _) => reopen?.Invoke(); controls.Children.Add(open);
+        DockPanel.SetDock(controls, Dock.Top); gallery.Children.Add(controls); gallery.Children.Add(cachedPicture); Children.Insert(1, gallery);
         MouseDown += (_, e) => { last = e.GetPosition(this); CaptureMouse(); e.Handled = true; };
         MouseUp += (_, e) => { ReleaseMouseCapture(); e.Handled = true; };
         MouseMove += (_, e) =>
@@ -39,7 +54,28 @@ public sealed class ModelViewport : Grid
         MouseWheel += (_, e) => { distance = Math.Clamp(distance * Math.Exp(-e.Delta / 1000d), .05, 100); UpdateCamera(); e.Handled = true; };
         SizeChanged += (_, _) => UpdateCamera();
     }
-    public void ClearModel() { viewport.Children.Clear(); info.Text = ""; }
+    public void ClearModel() { viewport.Children.Clear(); scene = null; info.Text = ""; cachedPicture.Source = null; pictures = []; reopen = null; gallery.Visibility = Visibility.Collapsed; viewport.Visibility = reset.Visibility = Visibility.Visible; }
+    public void ShowCached(CachedRender cached, Action renderAgain)
+    {
+        ClearModel();
+        pictures = cached.Pictures.Select(p => ImagePreviewDecoder.Decode(p, "cache.png")).ToArray(); cachedPicture.Source = pictures[0]; reopen = renderAgain;
+        viewport.Visibility = reset.Visibility = Visibility.Collapsed; gallery.Visibility = Visibility.Visible;
+        info.Text = $"レンダリングキャッシュ · {cached.Statistics.TriangleCount:N0}ポリゴン（三角形）\n正面 / 側面 / 平面の透過写真。「3D表示」で再解析・描画します。\n" + string.Join("\n", cached.Notes);
+    }
+    public byte[][] CaptureViews()
+    {
+        if (scene == null) throw new InvalidOperationException("描画済みモデルがありません。");
+        var output = new List<byte[]>();
+        foreach (var (position, up) in new[] { (new Point3D(0, 0, 4), new Vector3D(0, 1, 0)), (new Point3D(4, 0, 0), new Vector3D(0, 1, 0)), (new Point3D(0, 4, 0), new Vector3D(0, 0, -1)) })
+        {
+            var view = new Viewport3D { Width = 1024, Height = 1024, ClipToBounds = true, Camera = new OrthographicCamera(position, new Vector3D(-position.X, -position.Y, -position.Z), up, 2.3) { NearPlaneDistance = .1, FarPlaneDistance = 100 } };
+            view.Children.Add(new ModelVisual3D { Content = scene }); view.Measure(new Size(1024, 1024)); view.Arrange(new Rect(0, 0, 1024, 1024)); view.UpdateLayout();
+            var image = new RenderTargetBitmap(1024, 1024, 96, 96, PixelFormats.Pbgra32); image.Render(view);
+            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image)); using var stream = new MemoryStream(); encoder.Save(stream); output.Add(stream.ToArray());
+            view.Children.Clear();
+        }
+        return output.ToArray();
+    }
     public void SetModel(ModelPreviewData model, IReadOnlyDictionary<string, Material>? materials = null)
     {
         model.Validate();
@@ -68,7 +104,7 @@ public sealed class ModelViewport : Grid
         }
         content.Children.Add(new AmbientLight(Color.FromRgb(190, 190, 190)));
         content.Children.Add(new DirectionalLight(Color.FromRgb(45, 45, 45), new Vector3D(-1, -2, -3)));
-        content.Freeze(); viewport.Children.Add(new ModelVisual3D { Content = content });
+        content.Freeze(); scene = content; viewport.Children.Add(new ModelVisual3D { Content = content });
         var s = model.Statistics;
         info.Text = $"頂点 {s.VertexCount:N0} / ポリゴン（三角形） {s.TriangleCount:N0}\nMesh {s.MeshCount:N0} / 依存Material {s.MaterialCount:N0} / Bone {s.BoneCount:N0} / Skin {(s.HasSkinning ? "あり" : "なし")}\n左ドラッグ: 回転 · 右/中ドラッグ: 移動 · ホイール: ズーム\n" + string.Join("\n", model.Notes);
         Reset();

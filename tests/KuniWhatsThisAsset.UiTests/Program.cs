@@ -11,7 +11,7 @@ internal static class Program
     {
         if (Environment.GetCommandLineArgs().Contains("--real-models")) return RealModelChecks.Run();
         var app = new App(); app.InitializeComponent();
-        var main = new MainWindow();
+        var main = new MainWindow(System.IO.Path.GetFullPath("artifacts/ui-profile-" + Guid.NewGuid().ToString("N")));
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
         object? Invoke(string name, params object[] args) => typeof(MainWindow).GetMethod(name, flags)!.Invoke(main, args);
         T Field<T>(string name) => (T)typeof(MainWindow).GetField(name, flags)!.GetValue(main)!;
@@ -258,6 +258,7 @@ internal static class Program
             Check(metaPrompts == 1 && Field<ModelViewport>("ModelView").Visibility == Visibility.Collapsed, "Declined Unity-material model rendered");
             Console.WriteLine("PASS package MTL pre-render warning with approval and Unity meta references with refusal");
             ModelMaterialChecks.Run();
+            FeatureChecks.Run(main);
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }

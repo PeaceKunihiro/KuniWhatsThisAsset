@@ -15,12 +15,7 @@ public partial class MainWindow : Window
     private readonly List<PackageItem> history = [];
     private int historyIndex = -1;
     private bool navigating;
-    public MainWindow()
-    {
-        InitializeComponent();
-        var args = Environment.GetCommandLineArgs();
-        if (args.Length == 2) Loaded += async (_, _) => await LoadPackage(args[1]);
-    }
+    public MainWindow() : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KuniWhatsThisAsset")) { }
     private async void Open_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog { Filter = "Unity Package (*.unitypackage)|*.unitypackage" };
@@ -55,7 +50,7 @@ public partial class MainWindow : Window
         Status.Text = "読み込み中…";
         try
         {
-            var limits = new ScanLimits();
+            var limits = preferences.ScanLimits();
             ScanLimits limitsForReport;
             while (true)
             {
@@ -73,6 +68,7 @@ public partial class MainWindow : Window
             }
             activeLimits = limitsForReport;
             BuildTree(); Notify(report.Findings);
+            RememberPackage(path);
             Status.Text = $"{report.FileCount:N0} ファイル · " + string.Join(" / ", report.Items.Where(i => !i.IsDirectory).GroupBy(i => i.Format).Select(g => $"{g.Key} {g.Count()}"));
         }
         catch (OperationCanceledException) { Status.Text = "解析中止（キャンセルまたは時間上限）"; }
@@ -153,10 +149,10 @@ public partial class MainWindow : Window
         StopImagePreview(); StopModelPreview();
         Preview.Text = item.TextPreview ?? "";
         Preview.Visibility = item.TextPreview == null ? Visibility.Collapsed : Visibility.Visible;
-        PreviewHint.Text = item.TextPreview == null ? "この形式のプレビューは未対応です。\nFBX・OBJはモデルプレビューに対応しています。" : "";
+        PreviewHint.Text = item.TextPreview == null ? "この形式のプレビューは未対応です。\nFBX・OBJ・Prefabはモデルプレビューに対応しています。" : "";
         Status.Text = $"{item.Name} · {item.Format} · {item.SizeLabel}";
         if (ImagePreviewDecoder.Supports(item.Path) && report != null) _ = ShowImageAsync(item, report, activeLimits);
-        else if (item.Format is ".fbx" or ".obj" && report != null) _ = ShowModelAsync(item, report, activeLimits);
+        else if (item.Format is ".fbx" or ".obj" or ".prefab" && report != null) { Preview.Visibility = Visibility.Collapsed; _ = ShowModelAsync(item, report, activeLimits); }
         UpdateNavigation();
     }
     private void UpdateNavigation() { BackButton.IsEnabled = historyIndex > 0; ForwardButton.IsEnabled = historyIndex >= 0 && historyIndex < history.Count - 1; }
@@ -187,12 +183,13 @@ public partial class MainWindow : Window
     private void OnDragOver(object sender, DragEventArgs e) { e.Effects = scanCancellation == null && e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; }
     private void Cancel_Click(object sender, RoutedEventArgs e) => scanCancellation?.Cancel();
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
-    private void Limits_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "初期上限：パッケージ512 MiB / 展開相当1 GiB / メンバー256 MiB\n項目50,000 / アセット10,000 / 解析2分\nテキスト先頭2 MiB、全体32 MiB予算。超過後は先頭4 KiB。\nテキスト表示32,768文字。未解析部分は警告します。\n読み込み容量・件数・時間の上限に達した場合は継続を確認します。\n承認すると容量・件数・時間の上限を今回だけすべて解除し、先頭から再試行します。", "読み込み上限");
-    private void Help_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "Fileから開くか、パッケージをドロップします。\nAlt＋左クリックで枝以下を一括展開・格納します。\n右側はプレビュー専用です。FBX・OBJの静止モデル表示に対応しています。\n異常検出時だけ下部に通知します。クリックで詳細を開きます。\n検出は静的ルールによるものです。未検出は安全性を保証しません。\nバージョン情報を開くと1日1回GitHubへ更新確認します。\n失敗時や当日確認済みの場合はStableへのリンクだけを表示します。", "使い方");
+    private void Limits_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "初期上限：パッケージ500 MiB（Setting → 読み込み設定から変更） / 展開相当1 GiB / メンバー256 MiB\n項目50,000 / アセット10,000 / 解析2分\nテキスト先頭2 MiB、全体32 MiB予算。超過後は先頭4 KiB。\nテキスト表示32,768文字。未解析部分は警告します。\n読み込み容量・件数・時間の上限に達した場合は継続を確認します。\n承認すると容量・件数・時間の上限を今回だけすべて解除し、先頭から再試行します。", "読み込み上限");
+    private void Help_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "Fileから開くか、パッケージをドロップします。\nAlt＋左クリックで枝以下を一括展開・格納します。\n右側はプレビュー専用です。FBX・OBJ・Prefabの静止近似表示に対応しています。\n異常検出時だけ下部に通知します。クリックで詳細を開きます。\n検出は静的ルールによるものです。未検出は安全性を保証しません。\nバージョン情報を開くと1日1回GitHubへ更新確認します。\n失敗時や当日確認済みの場合はStableへのリンクだけを表示します。", "使い方");
     private void Licenses_Click(object sender, RoutedEventArgs e) => new LicenseWindow { Owner = this }.ShowDialog();
     private void About_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();
-    protected override void OnClosed(EventArgs e) { scanCancellation?.Cancel(); StopImagePreview(); StopModelPreview(); warningWindow?.Close(); base.OnClosed(e); }
+    protected override void OnClosed(EventArgs e) { bookmarkTimer.Stop(); scanCancellation?.Cancel(); StopImagePreview(); StopModelPreview(); warningWindow?.Close(); base.OnClosed(e); }
 }
+
 
 
 

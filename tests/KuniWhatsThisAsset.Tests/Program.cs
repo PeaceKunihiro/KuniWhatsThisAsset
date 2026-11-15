@@ -291,6 +291,52 @@ Test("model load warning inclusive thresholds and no-render decision", () =>
     Check(!ModelRenderPolicy.Approve(stats with { MaterialCount = 10 }, Refuse) && prompts == 2, "10 materials did not warn");
     Check(ModelRenderPolicy.Approve(stats with { TriangleCount = 100001 }, _ => true), "Approval rejected");
 });
+Test("settings persist arbitrary MiB and unlimited package preserves other guards", () =>
+{
+    var store = new PreferenceStore(Path.Combine(output, "preferences-" + Guid.NewGuid()));
+    var defaults = store.Read(); Check(defaults.PackageLimitMiB == 500 && defaults.CacheLimitMiB == 500, "Incorrect defaults");
+    var state = defaults with { PackageLimitMiB = 1234, CacheLimitMiB = 12, PackageUnlimited = true }; store.Write(state);
+    var read = store.Read(); Check(read.PackageLimitMiB == 1234 && read.CacheLimitMiB == 12 && read.PackageUnlimited, "Settings not persisted");
+    Check(read.ScanLimits().MaxPackageBytes == long.MaxValue && !read.ScanLimits().IgnoreReadLimits, "Unlimited package disabled unrelated guards");
+    bool rejected = false; try { (state with { CacheLimitMiB = 0 }).Validate(); } catch (ArgumentException) { rejected = true; } Check(rejected, "Invalid numeric value accepted");
+});
+Test("recent packages maximum ten, reorder, directory bookmarks add/remove", () =>
+{
+    var store = new PreferenceStore(Path.Combine(output, "navigation-" + Guid.NewGuid())); var state = store.Read();
+    for (int i = 0; i < 12; i++) state = store.RecordPackage(state, Path.Combine(output, $"recent{i}.unitypackage"));
+    Check(state.RecentPackages.Count == 10 && state.RecentPackages[0].EndsWith("recent11.unitypackage"), "History bound/order wrong");
+    state = store.RecordPackage(state, state.RecentPackages[5]); Check(state.RecentPackages.Count == 10 && state.RecentPackages.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 10, "History duplicates");
+    state = store.Bookmark(state, output, true); state = store.Bookmark(state, output, true); Check(store.Read().Bookmarks.Count == 1, "Bookmark duplicates");
+    state = store.Bookmark(state, output, false); Check(store.Read().Bookmarks.Count == 0, "Bookmark not removed");
+});
+Test("cache quota LRU, unlimited, oversize skip and corrupt content", () =>
+{
+    string folder = Path.Combine(output, "cache-" + Guid.NewGuid()); var cache = new RenderCache(folder); var settings = new UserPreferences { CacheLimitMiB = 1 };
+    var entry = new CachedRender(new(3, 1, 1, 1, 0, false), [new byte[100000], new byte[100000], new byte[100000]], []);
+    string Key(int i) => i.ToString("x64");
+    for (int i = 1; i <= 3; i++) { Check(cache.Write(Key(i), entry, settings), "Cache write failed"); File.SetLastWriteTimeUtc(Path.Combine(folder, Key(i) + ".json"), DateTime.UtcNow.AddDays(-10 + i)); }
+    Check(cache.Read(Key(1)) != null, "Missing cached entry"); cache.Write(Key(4), entry, settings);
+    Check(cache.Read(Key(2)) == null && cache.Read(Key(1)) != null && cache.Read(Key(4)) != null, "LRU did not protect recently accessed entry");
+    cache.Write(Key(5), entry, settings with { CacheUnlimited = true }); Check(cache.Read(Key(3)) != null, "Unlimited evicted a photo");
+    cache.Trim(settings); Check(new DirectoryInfo(folder).EnumerateFiles().Sum(f => f.Length) <= 1024 * 1024, "Trim exceeded quota");
+    Check(!cache.Write(Key(6), entry with { Pictures = [new byte[400000], new byte[400000], new byte[400000]] }, settings), "Oversized cache entry was stored");
+    cache.Write(Key(7), entry, settings); File.WriteAllText(Path.Combine(folder, Key(7) + ".front.png"), "corrupt"); Check(cache.Read(Key(7)) == null, "Corrupt photo reused");
+    File.WriteAllText(Path.Combine(folder, Key(7) + ".json"), "{\"Statistics\":null,\"Hashes\":[],\"Notes\":[]}"); Check(cache.Read(Key(7)) == null, "Incomplete cache manifest reused");
+});
+Test("cache identity covers package bytes and selected asset", () =>
+{
+    string file = Path.Combine(output, "hash-input.bin"); File.WriteAllText(file, "first");
+    string a = RenderCache.KeyAsync(file, guid, CancellationToken.None).GetAwaiter().GetResult();
+    string b = RenderCache.KeyAsync(file, new string('b', 32), CancellationToken.None).GetAwaiter().GetResult();
+    File.WriteAllText(file, "other"); string c = RenderCache.KeyAsync(file, guid, CancellationToken.None).GetAwaiter().GetResult();
+    Check(a != b && a != c, "Changed package or asset retained cache identity");
+});
+Test("Prefab parser rejects binary and resolves inactive ancestors", () =>
+{
+    bool rejected = false; try { PrefabAnalysis.Parse("binary"); } catch (InvalidDataException) { rejected = true; } Check(rejected, "Binary prefab accepted");
+    string text = "%YAML 1.1\n--- !u!1 &1\nGameObject:\n  m_Name: root\n  m_IsActive: 0\n--- !u!4 &2\nTransform:\n  m_GameObject: {fileID: 1}\n  m_Father: {fileID: 0}\n--- !u!1 &3\nGameObject:\n  m_Name: child\n  m_IsActive: 1\n--- !u!4 &4\nTransform:\n  m_GameObject: {fileID: 3}\n  m_Father: {fileID: 2}\n--- !u!137 &5\nSkinnedMeshRenderer:\n  m_GameObject: {fileID: 3}\n  m_Enabled: 1\n  m_Mesh: {fileID: 4300000, guid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, type: 3}\n";
+    var prefab = PrefabAnalysis.Parse(text); Check(!prefab.RootActive && !prefab.Renderers[0].Enabled, "Inactive ancestor ignored");
+});
 Console.WriteLine($"\n{passed} passed, {failed} failed. Fixtures: {output}");
 return failed == 0 ? 0 : 1;
 

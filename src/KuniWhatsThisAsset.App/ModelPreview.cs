@@ -12,13 +12,38 @@ public partial class MainWindow
         modelCancellation?.Cancel(); modelCancellation = null;
         ModelView.ClearModel(); ModelView.Visibility = Visibility.Collapsed;
     }
-    private async Task ShowModelAsync(PackageItem item, PackageReport source, ScanLimits limits, Func<ModelStatistics, bool>? confirm = null)
+    private Task ShowModelAsync(PackageItem item, PackageReport source, ScanLimits limits, Func<ModelStatistics, bool>? confirm = null) => ShowModelCoreAsync(item, source, limits, confirm, true);
+    private async Task ShowModelCoreAsync(PackageItem item, PackageReport source, ScanLimits limits, Func<ModelStatistics, bool>? confirm, bool useCache)
     {
         using var cts = new CancellationTokenSource(); modelCancellation = cts;
         PreviewHint.Text = "モデルを解析中…";
         try
         {
+            var cache = new RenderCache(Path.Combine(preferenceStore.DirectoryPath, "RenderCache"));
+            string cacheKey = await RenderCache.KeyAsync(source.SourcePath, item.Guid, cts.Token);
+            if (useCache)
+            {
+                try
+                {
+                    var cached = await Task.Run(() => cache.Read(cacheKey), cts.Token);
+                    cts.Token.ThrowIfCancellationRequested();
+                    if (cached != null)
+                    {
+                        ModelView.ShowCached(cached, () => { StopModelPreview(); _ = ShowModelCoreAsync(item, source, limits, confirm, false); });
+                        ModelView.Visibility = Visibility.Visible; PreviewHint.Text = ""; Status.Text = item.Name + " · レンダリングキャッシュ"; return;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException or ArgumentException or InvalidOperationException or NotSupportedException or System.Runtime.InteropServices.COMException) { ModelView.ClearModel(); }
+            }
             string metadataText = "";
+            ModelPreviewData model;
+            if (item.Format == ".prefab")
+            {
+                var prefab = await PrefabPreviewBuilder.BuildAsync(new PackageReader(limits), source, item, cts.Token);
+                model = prefab.Model; metadataText = prefab.MaterialMetadata;
+            }
+            else
+            {
             var input = await Task.Run(() =>
             {
                 var reader = new PackageReader(limits);
@@ -60,7 +85,8 @@ public partial class MainWindow
                 }
                 return new ModelInput(item.Path, bytes, dependencies, referencedMaterialCount);
             }, cts.Token);
-            var model = await ModelWorker.ImportAsync(input, cts.Token);
+            model = await ModelWorker.ImportAsync(input, cts.Token);
+            }
             cts.Token.ThrowIfCancellationRequested();
             var stats = model.Statistics;
             bool approved = ModelRenderPolicy.Approve(stats, confirm ?? (s => MessageBox.Show(this,
@@ -74,6 +100,14 @@ public partial class MainWindow
             cts.Token.ThrowIfCancellationRequested();
             ModelView.SetModel(model, materials); ModelView.Visibility = Visibility.Visible; PreviewHint.Text = "";
             Status.Text = $"{item.Name} · {stats.TriangleCount:N0}ポリゴン（三角形） · Material {stats.MaterialCount:N0}";
+            try
+            {
+                var pictures = ModelView.CaptureViews();
+                var entry = new CachedRender(stats, pictures, model.Notes);
+                bool saved = await Task.Run(() => { cts.Token.ThrowIfCancellationRequested(); return cache.Write(cacheKey, entry, preferences); }, cts.Token);
+                if (!cts.IsCancellationRequested && !saved) Status.Text += " · 写真がキャッシュ上限を超えるため保存を省略";
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { if (!cts.IsCancellationRequested) Status.Text += " · キャッシュ保存不可: " + ex.Message; }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or InvalidOperationException or NotSupportedException or System.Text.Json.JsonException or System.ComponentModel.Win32Exception or System.Text.RegularExpressions.RegexMatchTimeoutException)

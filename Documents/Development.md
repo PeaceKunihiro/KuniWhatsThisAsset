@@ -96,3 +96,17 @@ Help→ライセンスで、src/KuniWhatsThisAsset.App/Licenses/の原文をEmbe
 ## v0.7.0 更新確認
 
 追加パッケージなしでHttpClient・System.Text.Json・ファイル排他を使用する。更新確認は指定GitHubに対するユーザー起点の通信で、パッケージ解析の外部送信禁止と区別する。状態保存はLocalApplicationData配下、レスポンス制限は1 MiB/1,000項目、タイムアウト5秒、自動再試行・リダイレクト追跡なし。ダウンロード先は固定したリポジトリのraw URLと完全一致する候補に限定する。詳細と検証範囲はUpdateCheckPlan.md。
+
+## v0.9.0 Prefab・レンダリングキャッシュ・読み込み設定
+
+PrefabAnalysisはUnity YAMLの既知フィールドだけを読み、PrefabPreviewBuilderがパッケージ内参照を解決する。外部スクリプト・DLLは実行しない。直接Rendererは有効状態・祖先非表示・Mesh名/旧fileID表・材質スロットを使用する。FBXインスタンスは元モデルの初期形状のみを用い、差分の未反映を表示する。入れ子参照は深さ8、訪問32、元モデル16まで。循環参照は拒否する。Unity組み込みMeshやファイル不足は説明して省略する。
+
+ModelViewport.CaptureViewsは背景や操作UIを含まない独立Viewport3DとOrthographicCameraで1,024pxの正面/右側面/上面PNGを生成する。RenderCacheは固定長ハッシュ名の平坦なファイル群のみを管理し、再帰削除を行わない。パッケージ全体SHA256・選択GUID・描画改訂番号をキーにし、PNGハッシュと完了マニフェストを検証する。読書き・LRU削除はユーザープロファイル別の名前付きMutexで排他制御する。最終参照時刻はマニフェストmtimeとし、PNG三枚とJSONの総サイズで容量を管理する。
+
+UserPreferences/PreferenceStoreで上限・履歴10件・フォルダーブックマークをJSON保存する。既存の更新確認日ファイルとは別ファイルとする。初期容量はpackage/cacheとも500 MiB。パッケージ容量の無制限設定はMaxPackageBytesのみ変更し、継続確認での今回全上限解除とは区別する。Settingの保存中に読み込みが終了しても新しい履歴を保持する。
+
+★ボタンの単一クリックはOSのダブルクリック時間を待って追加し、二重クリック時は追加タイマーを停止して削除する。ブックマークは物理ディレクトリを指し、開く操作ではそのフォルダーを初期位置にしたパッケージ選択ダイアログを表示する。
+
+Fuzzy/Luchika実Prefabで三方向の透過写真を目視確認。通常テストは独立したartifacts内プロファイルと自作モデルを使用し、ユーザー設定・キャッシュを汚さない。
+
+参考：[Unity YAML Prefab serialization](https://docs.unity.com/en-us/engine/6000.0/manual/working-with-scenes/text-scene-format/yaml-prefab-serialization)、[Unity YAML scene example](https://docs.unity.com/en-us/engine/6000.0/manual/working-with-scenes/text-scene-format/yamlscene-example)
