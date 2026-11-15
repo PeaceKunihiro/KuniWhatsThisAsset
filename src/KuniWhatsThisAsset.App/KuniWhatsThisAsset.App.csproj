@@ -3,9 +3,11 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>../../IMGs/KWTA_icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <Resource Include="../../IMGs/KWTA_icon.png" Link="Assets/KWTA_icon.png" />
     <ProjectReference Include="../KuniWhatsThisAsset.Core/KuniWhatsThisAsset.Core.csproj" />
   </ItemGroup>
 </Project>

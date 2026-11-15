@@ -17,6 +17,7 @@ public sealed record PackageReport(string SourcePath, IReadOnlyList<PackageItem>
 }
 public sealed record ScanLimits
 {
+    public bool IgnoreReadLimits { get; init; }
     public long MaxPackageBytes { get; init; } = 512L * 1024 * 1024;
     public long MaxExpandedBytes { get; init; } = 1024L * 1024 * 1024;
     public long MaxMemberBytes { get; init; } = 256L * 1024 * 1024;
@@ -26,3 +27,4 @@ public sealed record ScanLimits
     public int MaxTotalTextBytes { get; init; } = 32 * 1024 * 1024;
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(2);
 }
+

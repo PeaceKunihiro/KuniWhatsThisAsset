@@ -22,11 +22,18 @@ public sealed class PackageReader
 
     public PackageReport Read(string file, CancellationToken cancellationToken = default, IProgress<int>? progress = null)
     {
+        try { return ReadInternal(file, cancellationToken, progress); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { throw new ReadLimitExceededException(ReadLimitKind.Timeout, "解析時間の上限に達しました。"); }
+    }
+
+    private PackageReport ReadInternal(string file, CancellationToken cancellationToken, IProgress<int>? progress)
+    {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(limits.Timeout);
+        if (!limits.IgnoreReadLimits) deadline.CancelAfter(limits.Timeout);
         var token = deadline.Token;
         using var input = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (input.Length > limits.MaxPackageBytes) throw new InvalidDataException("パッケージの容量上限を超えています。");
+        if (!limits.IgnoreReadLimits && input.Length > limits.MaxPackageBytes) throw new ReadLimitExceededException(ReadLimitKind.PackageBytes, "パッケージの容量上限を超えています。");
         if (input.Length < 18) throw new InvalidDataException("GZipファイルが短すぎます。");
         Span<byte> footer = stackalloc byte[8];
         input.Seek(-8, SeekOrigin.End);
@@ -50,7 +57,7 @@ public sealed class PackageReader
             entry = tar.GetNextEntry(copyData: false);
             if (entry == null) break;
             token.ThrowIfCancellationRequested();
-            if (++count > limits.MaxEntries) throw new InvalidDataException("アーカイブ内の項目数が上限を超えています。");
+            if (++count > limits.MaxEntries && !limits.IgnoreReadLimits) throw new ReadLimitExceededException(ReadLimitKind.Entries, "アーカイブ内の項目数が上限を超えています。");
             string name = entry.Name.TrimEnd('/');
             ValidatePath(name);
             if (!names.Add(name)) throw new InvalidDataException($"アーカイブ内に重複した項目があります: {name}");
@@ -61,13 +68,13 @@ public sealed class PackageReader
             }
             if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile))
                 throw new InvalidDataException($"リンク・特殊ファイルは読み込めません: {name}");
-            if (entry.Length < 0 || entry.Length > limits.MaxMemberBytes) throw new InvalidDataException($"ファイルの容量上限を超えています: {name}");
+            if (entry.Length < 0 || (!limits.IgnoreReadLimits && entry.Length > limits.MaxMemberBytes)) throw new ReadLimitExceededException(ReadLimitKind.MemberBytes, $"ファイルの容量上限を超えています: {name}");
             string[] parts = name.Split('/');
             if (parts.Length != 2 || !Regex.IsMatch(parts[0], @"\A[0-9a-fA-F]{32}\z"))
                 throw new InvalidDataException($"UnityPackageのGUID/ファイル構造ではありません: {name}");
             if (!assets.TryGetValue(parts[0], out var asset))
             {
-                if (assets.Count >= limits.MaxAssets) throw new InvalidDataException("アセット数が上限を超えています。");
+                if (!limits.IgnoreReadLimits && assets.Count >= limits.MaxAssets) throw new ReadLimitExceededException(ReadLimitKind.Assets, "アセット数が上限を超えています。");
                 assets.Add(parts[0], asset = new());
             }
             switch (parts[1])
@@ -202,11 +209,11 @@ public sealed class PackageReader
                 headerBytes = 0;
                 if (header.AsSpan().IndexOfAnyExcept((byte)0) < 0) { endBlocks++; continue; }
                 if (endBlocks > 0) throw new InvalidDataException("TAR終端の後に別の項目があります。");
-                if (++physicalEntries > limits.MaxEntries) throw new InvalidDataException("アーカイブ項目数の上限を超えています。");
+                if (++physicalEntries > limits.MaxEntries && !limits.IgnoreReadLimits) throw new ReadLimitExceededException(ReadLimitKind.Entries, "アーカイブ項目数の上限を超えています。");
                 if (header[156] is not (0 or (byte)'0' or (byte)'5'))
                     throw new InvalidDataException("TARのリンク・特殊ファイル・PAX/GNU拡張レコードは読み込めません。");
                 long size = Octal(header.AsSpan(124, 12));
-                if (size > limits.MaxMemberBytes) throw new InvalidDataException("TARメンバーの容量上限を超えています。");
+                if (!limits.IgnoreReadLimits && size > limits.MaxMemberBytes) throw new ReadLimitExceededException(ReadLimitKind.MemberBytes, "TARメンバーの容量上限を超えています。");
                 if (header[156] == '5' && size != 0) throw new InvalidDataException("ディレクトリのサイズが不正です。");
                 long checksum = 0;
                 for (int i = 0; i < 512; i++) checksum += i is >= 148 and < 156 ? 32 : header[i];
@@ -242,9 +249,9 @@ public sealed class PackageReader
         public override int Read(Span<byte> buffer)
         {
             token.ThrowIfCancellationRequested();
-            int n = inner.Read(buffer[..(int)Math.Min(buffer.Length, Math.Max(1, limits.MaxExpandedBytes - BytesRead + 1))]);
+            int n = inner.Read(limits.IgnoreReadLimits ? buffer : buffer[..(int)Math.Min(buffer.Length, Math.Max(1, limits.MaxExpandedBytes - BytesRead + 1))]);
             BytesRead += n;
-            if (BytesRead > limits.MaxExpandedBytes) throw new InvalidDataException("展開後の総容量上限を超えています。");
+            if (!limits.IgnoreReadLimits && BytesRead > limits.MaxExpandedBytes) throw new ReadLimitExceededException(ReadLimitKind.ExpandedBytes, "展開後の総容量上限を超えています。");
             GuardHeaders(buffer[..n]);
             foreach (byte value in buffer[..n])
             {
@@ -264,4 +271,6 @@ public sealed class PackageReader
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }
+
+
 

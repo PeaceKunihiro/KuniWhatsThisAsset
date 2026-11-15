@@ -37,7 +37,7 @@ void Asset(TarWriter tar, string id, string path, byte[] data)
 PackageReport Read(string file, ScanLimits? limits = null) => new PackageReader(limits).Read(file);
 void Reject(Action action)
 {
-    try { action(); } catch (InvalidDataException) { return; } catch (EndOfStreamException) { return; }
+    try { action(); } catch (ReadLimitExceededException) { return; } catch (InvalidDataException) { return; } catch (EndOfStreamException) { return; }
     throw new Exception("不正な入力が拒否されませんでした。");
 }
 
@@ -160,5 +160,36 @@ Test("reject PAX metadata before processing payload", () =>
     }
     Reject(() => Read(file));
 });
+Test("limit override is scoped and preserves validation", () =>
+{
+    var original = new ScanLimits { MaxPackageBytes = 8 };
+    string file = Path.Combine(output, "normal.unitypackage");
+    ReadLimitKind kind;
+    try { Read(file, original); throw new Exception("No limit exception"); }
+    catch (ReadLimitExceededException ex) { kind = ex.Kind; }
+    Check(kind == ReadLimitKind.PackageBytes, "Wrong limit kind");
+    var raised = original;
+    while (raised.MaxPackageBytes < new FileInfo(file).Length) raised = raised.Increase(kind);
+    Check(Read(file, raised).FileCount == 2, "Retry failed");
+    Check(original.MaxPackageBytes == 8, "Original limit mutated");
+    Reject(() => Read(Path.Combine(output, "bad-crc.unitypackage"), raised));
+});
+Test("approved reading bypasses all resource limits but preserves integrity and cancellation", () =>
+{
+    var restricted = new ScanLimits { MaxPackageBytes = 1, MaxExpandedBytes = 1, MaxMemberBytes = 1, MaxEntries = 1, MaxAssets = 1, Timeout = TimeSpan.FromMilliseconds(1) };
+    var approved = restricted with { IgnoreReadLimits = true };
+    var r = Read(Path.Combine(output, "normal.unitypackage"), approved);
+    Check(r.FileCount == 2, "Approved read failed");
+    Check(!restricted.IgnoreReadLimits, "Approval leaked to original settings");
+    Reject(() => Read(Path.Combine(output, "normal.unitypackage"), restricted));
+    Reject(() => Read(Path.Combine(output, "bad-crc.unitypackage"), approved));
+    Reject(() => Read(Path.Combine(output, "member-traversal.unitypackage"), approved));
+    using var cts = new CancellationTokenSource(); cts.Cancel();
+    try { new PackageReader(approved).Read(Path.Combine(output, "normal.unitypackage"), cts.Token); }
+    catch (OperationCanceledException) { return; }
+    throw new Exception("Cancellation bypassed");
+});
 Console.WriteLine($"\n{passed} passed, {failed} failed. Fixtures: {output}");
 return failed == 0 ? 0 : 1;
+
+

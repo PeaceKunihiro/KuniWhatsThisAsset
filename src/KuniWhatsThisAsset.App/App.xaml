@@ -1,7 +1,9 @@
 <Application x:Class="KuniWhatsThisAsset.App.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" StartupUri="MainWindow.xaml">
-  <Application.Resources>
-    <Style TargetType="Button"><Setter Property="Padding" Value="16,8"/><Setter Property="Margin" Value="0,0,8,0"/><Setter Property="Background" Value="#E4EFE5"/><Setter Property="BorderBrush" Value="#B7CABA"/></Style>
-    <Style TargetType="TextBox"><Setter Property="Padding" Value="8,6"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="BorderBrush" Value="#CBD2CC"/></Style>
-    <Style TargetType="DataGrid"><Setter Property="AutoGenerateColumns" Value="False"/><Setter Property="IsReadOnly" Value="True"/><Setter Property="CanUserAddRows" Value="False"/><Setter Property="CanUserDeleteRows" Value="False"/><Setter Property="GridLinesVisibility" Value="Horizontal"/><Setter Property="HorizontalGridLinesBrush" Value="#EDF0ED"/><Setter Property="HeadersVisibility" Value="Column"/><Setter Property="RowHeight" Value="32"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Background" Value="White"/><Setter Property="EnableRowVirtualization" Value="True"/><Setter Property="SelectionMode" Value="Single"/></Style>
+  <Application.Resources><SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#8171B0"/><SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFFFFF"/>
+    <Style TargetType="Button"><Setter Property="Padding" Value="16,8"/><Setter Property="Margin" Value="0,0,8,0"/><Setter Property="Background" Value="#E6C6A2"/><Setter Property="BorderBrush" Value="#A47A50"/></Style>
+    <Style TargetType="TextBox"><Setter Property="Padding" Value="8,6"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="BorderBrush" Value="#A47A50"/></Style>
+    <Style TargetType="DataGrid"><Setter Property="AutoGenerateColumns" Value="False"/><Setter Property="IsReadOnly" Value="True"/><Setter Property="CanUserAddRows" Value="False"/><Setter Property="CanUserDeleteRows" Value="False"/><Setter Property="GridLinesVisibility" Value="Horizontal"/><Setter Property="HorizontalGridLinesBrush" Value="#E9DCCB"/><Setter Property="HeadersVisibility" Value="Column"/><Setter Property="RowHeight" Value="32"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Background" Value="#FFF5E8"/><Setter Property="EnableRowVirtualization" Value="True"/><Setter Property="SelectionMode" Value="Single"/></Style>
   </Application.Resources>
 </Application>
+
+
