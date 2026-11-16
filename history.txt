@@ -108,3 +108,14 @@
 - System.IO.Hashing 10.0.0とMIT原文・第三者通知を同梱し、Helpライセンス7項目を検証。描画キャッシュはv0.10.0-1に更新。
 - Release publish・同梱exe workerスモーク成功。Stable ZIP 69,520,992 bytes / 414項目、SHA256 3f51a11f3fc4c661981a6324e7e0c1b9e68842da2f24d4a21950bbc49cf00ba9。
 - モデル等のユーザーデータ・設定・検証画像のZIP非混入を確認。配置/Bone/BlendShape/Shader/Particleの完全再現は未対応のまま。
+
+2026-11-16 v0.10.1
+- SharlenのHairがBodyの子で、初期X回転の累積が約-180°となる現象を確認。記録されたBindPoseの全体回転はBody/Hairとも-90°。
+- スキン付きバイナリFBXの一意な静止BindPoseを配置に使用。法線と反射時の面方向も追従する。通常メッシュ・ASCII・姿勢なし・Geometric補助経路は従来変換。
+- 32/64bitヘッダーと圧縮/非圧縮行列の読み取り、境界/件数/深さ/値の制限を追加。矛盾姿勢・重複名は採用せず、解析失敗は警告と元の変換へフォールバック。
+- Sharlen FBXと通常/FT/alt/alt2の5経路で、髪Y=1.1790～1.6575、Z=-0.1945～0.1318。正面/側面写真で頭との一致を確認。
+- Core 53件、WPF UI、7400/7500・圧縮行列・行列方向・重複/矛盾/不正範囲のテスト成功。
+- Fuzzy/LuchikaのFBX/Prefab、およびAkyo PC/Quest・ネコメイド6経路を確認。旧FUWATTO入力はRドライブに存在せず今回の再表示は未実施。
+- キャッシュ改訂をv0.10.1-1へ更新。README/仕様/開発/調査資料を更新。
+- Release発行版のworkerでもSharlenの髪位置とversion=0.10.1.0を確認。ZIPにユーザーアセット/設定/キャッシュが含まれないことを検証。
+- Stable ZIP 69526732 bytes / SHA256 bd020530dfcccc7afc3f55748e4ac48df8c49f70d1061c00dd3f1a169c588af9  KuniWhatsThisAsset-v0.10.1-win-x64.zip

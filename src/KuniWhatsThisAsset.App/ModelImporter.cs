@@ -29,6 +29,22 @@ public static class ModelImporter
         context.SetIOSystem(io);
         var scene = context.ImportFile(io.MainPath, PostProcessSteps.Triangulate | PostProcessSteps.GenerateSmoothNormals | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.ValidateDataStructure);
         if (scene == null || scene.RootNode == null || !scene.HasMeshes) throw new InvalidDataException("表示できるメッシュがありません。");
+        var bindPoses = new Dictionary<string, Matrix4x4>(); string? bindIssue = null;
+        if (Path.GetExtension(input.Path).Equals(".fbx", StringComparison.OrdinalIgnoreCase))
+        {
+            try { bindPoses = FbxBindPose.Read(input.Bytes); }
+            catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException or DecoderFallbackException or OverflowException)
+            { bindIssue = "FBXバインド姿勢を解析できないため、ノードの初期変換で表示します。"; }
+        }
+        var nodeNames = new Dictionary<string, int>(StringComparer.Ordinal);
+        var nameStack = new Stack<(Node Node, int Depth)>(); nameStack.Push((scene.RootNode, 0)); int nameCount = 0;
+        while (nameStack.TryPop(out var entry))
+        {
+            if (++nameCount > 100000 || entry.Depth > 128) throw new InvalidDataException("モデルの階層が大きすぎます。");
+            string name = entry.Node.Name ?? "";
+            nodeNames[name] = nodeNames.GetValueOrDefault(name) + 1;
+            foreach (var child in entry.Node.Children) nameStack.Push((child, entry.Depth + 1));
+        }
         var result = new List<PreviewMesh>();
         var materials = new HashSet<int>();
         var bones = new HashSet<string>(StringComparer.Ordinal);
@@ -41,12 +57,18 @@ public static class ModelImporter
             if (++visited > 100_000 || next.Depth > 128) throw new InvalidDataException("モデルの階層が大きすぎます。");
             // Assimp stores column-vector transforms; System.Numerics uses row vectors.
             var transform = Matrix4x4.Transpose(next.Node.Transform) * next.Parent;
-            if (!Matrix4x4.Invert(transform, out var inverse)) throw new InvalidDataException("モデルの変換行列が不正です。");
-            var normalTransform = Matrix4x4.Transpose(inverse);
+            if (!Matrix4x4.Invert(transform, out _)) throw new InvalidDataException("モデルの変換行列が不正です。");
             foreach (int index in next.Node.MeshIndices)
             {
                 if (index < 0 || index >= scene.MeshCount) throw new InvalidDataException("メッシュ参照が不正です。");
                 var mesh = scene.Meshes[index];
+                // A skinned mesh's recorded bind pose can differ from the current node hierarchy.
+                // Use that global pose once; do not accumulate the mesh parent's rotation again.
+                var meshTransform = mesh.BoneCount > 0 && !next.Path.Contains("_$AssimpFbx$_Geometric", StringComparison.Ordinal)
+                    && nodeNames.GetValueOrDefault(next.Node.Name ?? "") == 1 && bindPoses.TryGetValue(next.Node.Name ?? "", out var bind)
+                    ? bind * Matrix4x4.Transpose(scene.RootNode.Transform) : transform;
+                if (!Matrix4x4.Invert(meshTransform, out var meshInverse)) throw new InvalidDataException("モデルのバインド変換が不正です。");
+                var meshNormalTransform = Matrix4x4.Transpose(meshInverse);
                 var faces = mesh.Faces.Where(f => f.IndexCount == 3).ToArray();
                 if (faces.Length == 0) continue;
                 vertices += mesh.VertexCount; triangles += faces.Length;
@@ -55,14 +77,14 @@ public static class ModelImporter
                 var normals = new float[positions.Length];
                 for (int i = 0; i < mesh.VertexCount; i++)
                 {
-                    Vector3 v = Vector3.Transform(mesh.Vertices[i], transform);
-                    Vector3 n = mesh.HasNormals ? Vector3.TransformNormal(mesh.Normals[i], normalTransform) : Vector3.UnitY;
+                    Vector3 v = Vector3.Transform(mesh.Vertices[i], meshTransform);
+                    Vector3 n = mesh.HasNormals ? Vector3.TransformNormal(mesh.Normals[i], meshNormalTransform) : Vector3.UnitY;
                     if (n.LengthSquared() > 0) n = Vector3.Normalize(n);
                     positions[i * 3] = v.X; positions[i * 3 + 1] = v.Y; positions[i * 3 + 2] = v.Z;
                     normals[i * 3] = n.X; normals[i * 3 + 1] = n.Y; normals[i * 3 + 2] = n.Z;
                 }
                 var indices = faces.SelectMany(f => f.Indices).ToArray();
-                if (transform.GetDeterminant() < 0)
+                if (meshTransform.GetDeterminant() < 0)
                     for (int i = 0; i < indices.Length; i += 3) (indices[i + 1], indices[i + 2]) = (indices[i + 2], indices[i + 1]);
                 if (mesh.MaterialIndex < 0 || mesh.MaterialIndex >= scene.MaterialCount) throw new InvalidDataException("材質参照が不正です。");
                 materials.Add(mesh.MaterialIndex);
@@ -77,6 +99,7 @@ public static class ModelImporter
         }
         string[] notes = ["静止形状・テクスチャ・簡易アニメ調照明で表示。Unity Shader、Prefab設定、アニメーションの完全再現は非対応。"];
         if (io.DeniedCount > 0) notes = [notes[0], $"パッケージ外または未取得の外部参照を{io.DeniedCount}件ブロックしました。"];
+        if (bindIssue != null) notes = [.. notes, bindIssue];
         var data = new ModelPreviewData(new(vertices, triangles, scene.MeshCount, Math.Max(materials.Count, input.ReferencedMaterialCount), bones.Count, bones.Count > 0), result.ToArray(), notes);
         data.Validate();
         return data;

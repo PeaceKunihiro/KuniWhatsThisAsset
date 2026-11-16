@@ -144,3 +144,11 @@ ModelImporterは各メッシュの元NodePath・MeshName・Skinnedをworker JSON
 未知IDの差分は対象GUID/ID単位で警告へまとめる。配置・Bone姿勢・BlendShape・追加/削除Component・ParticleSystemは静止近似の範囲外。RenderCacheの改訂番号はv0.10.0-1へ更新する。
 
 通常UIテストでUnicode名、Unity既知ID、入れ子Variant、材質上書き、非表示、未知ID、Material/Mat競合を検証。--fuwatto-bindingsで通常/黒Variantの全材質参照を確認し、--fuwatto-analysisでライブ/キャッシュ表示と残存警告1件・通常情報1件を確認。指定された実データを使うオプション検証は配布物に含めない。
+
+## v0.10.1 静止バインド姿勢の配置修正
+
+バイナリFBXのスキン付きメッシュは一意なBindPoseの全体行列を静止配置に使用する。FbxBindPoseはModel ID/名前とPoseNode Matrixだけを読む。矛盾姿勢・重複名・特異行列は採用せず、通常メッシュ・ASCII・姿勢なし・Geometric補助ノード経路は従来変換を維持する。解析失敗は警告を添えてフォールバックする。法線と面の向きも配置と同じ変換へ合わせる。
+
+SharlenのHairでは親子の初期回転の累積が-180°になる一方、記録された全体BindPoseはBodyと同じ-90°だった。元FBXの静止姿勢を使うことでFBX直接・4種Prefabの髪位置を修正する。BoneアニメーションやPrefab配置差分の完全対応ではない。RenderCacheはv0.10.1-1へ更新。
+
+BindPoseChecksは7400/7500、圧縮/非圧縮、行列方向、重複名・矛盾姿勢・不正オフセットを検証。--sharlen-modelsでユーザー提供パッケージの5経路と正面/側面を確認し、--sharlen-probeでネイティブ階層・行列を診断できる。詳細：SharlenMeshPosition-2026-11-16.md。

@@ -14,6 +14,8 @@ internal static class Program
         if (Environment.GetCommandLineArgs().Contains("--texture-models")) return TextureModelChecks.Run();
         if (Environment.GetCommandLineArgs().Contains("--fuwatto-analysis")) return FuwattoChecks.Run();
         if (Environment.GetCommandLineArgs().Contains("--model-ids")) return ModelIdProbe.Run();
+        if (Environment.GetCommandLineArgs().Contains("--sharlen-models")) return SharlenChecks.Actual();
+        if (Environment.GetCommandLineArgs().Contains("--sharlen-probe")) return SharlenChecks.Probe();
         var app = new App(); app.InitializeComponent();
         var main = new MainWindow(System.IO.Path.GetFullPath("artifacts/ui-profile-" + Guid.NewGuid().ToString("N")));
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
@@ -263,7 +265,7 @@ internal static class Program
             Console.WriteLine("PASS package MTL pre-render warning with approval and Unity meta references with refusal");
             ModelMaterialChecks.Run();
             MaterialResolverChecks.Run();
-            FeatureChecks.Run(main); ReferenceChecks.Run();
+            FeatureChecks.Run(main); ReferenceChecks.Run(); BindPoseChecks.Run();
             WarningIntegrationChecks.Run(main);
             return 0;
         }
