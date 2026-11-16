@@ -33,8 +33,8 @@ public static class ModelImporter
         var materials = new HashSet<int>();
         var bones = new HashSet<string>(StringComparer.Ordinal);
         long vertices = 0, triangles = 0;
-        var pending = new Stack<(Node Node, Matrix4x4 Parent, int Depth)>();
-        pending.Push((scene.RootNode, Matrix4x4.Identity, 0));
+        var pending = new Stack<(Node Node, Matrix4x4 Parent, int Depth, string Path)>();
+        pending.Push((scene.RootNode, Matrix4x4.Identity, 0, ""));
         int visited = 0;
         while (pending.TryPop(out var next))
         {
@@ -70,10 +70,10 @@ public static class ModelImporter
                 var diffuse = material.HasColorDiffuse ? material.ColorDiffuse : new Vector4(.72f, .64f, .53f, 1f);
                 var uv = new float[mesh.VertexCount * 2];
                 if (mesh.HasTextureCoords(0)) for (int i = 0; i < mesh.VertexCount; i++) { uv[i * 2] = mesh.TextureCoordinateChannels[0][i].X; uv[i * 2 + 1] = 1 - mesh.TextureCoordinateChannels[0][i].Y; }
-                result.Add(new(positions, normals, indices, [Math.Clamp(diffuse.X, 0, 1), Math.Clamp(diffuse.Y, 0, 1), Math.Clamp(diffuse.Z, 0, 1), 1], uv, material.Name ?? "", next.Node.Name ?? "", material.HasTextureDiffuse ? material.TextureDiffuse.FilePath : ""));
+                result.Add(new(positions, normals, indices, [Math.Clamp(diffuse.X, 0, 1), Math.Clamp(diffuse.Y, 0, 1), Math.Clamp(diffuse.Z, 0, 1), 1], uv, material.Name ?? "", next.Node.Name ?? "", material.HasTextureDiffuse ? material.TextureDiffuse.FilePath : "", next.Path, mesh.Name ?? "", mesh.BoneCount > 0));
                 foreach (var bone in mesh.Bones) bones.Add(bone.Name);
             }
-            foreach (var child in next.Node.Children) pending.Push((child, transform, next.Depth + 1));
+            foreach (var child in next.Node.Children) pending.Push((child, transform, next.Depth + 1, next.Path.Length == 0 ? child.Name : next.Path + "/" + child.Name));
         }
         string[] notes = ["静止形状・テクスチャ・簡易アニメ調照明で表示。Unity Shader、Prefab設定、アニメーションの完全再現は非対応。"];
         if (io.DeniedCount > 0) notes = [notes[0], $"パッケージ外または未取得の外部参照を{io.DeniedCount}件ブロックしました。"];

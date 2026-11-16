@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="SharpAssimp" Version="6.0.12" ExcludeAssets="native" />
+    <PackageReference Include="System.IO.Hashing" Version="10.0.0" />
     <Content Include="$(NuGetPackageRoot)sharpassimp/6.0.12/runtimes/win-x64/native/assimp.dll" Link="Native/assimp.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="Licenses/*.txt" />
     <Content Include="Licenses/*.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

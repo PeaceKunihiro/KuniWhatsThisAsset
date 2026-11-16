@@ -1,12 +1,10 @@
-現在の作業：v0.9.1（2026-11-16）
-- FBX/Prefab材質探索をMaterialResolverへ共通化。明示GUID優先、親方向Materials、metaの検索/命名設定に対応。
-- 未解決FBX/OBJは同じパッケージ内のPrefab Mesh/材質スロットから一意の割り当てを補完。
-- 複数Prefabの競合、関連するPrefabインスタンスの材質差分、未対応/解析上限は推定せず説明。
-- 未解決の材質・画像を基本色で表示し、理由をプレビューへ追加。
-- 描画キャッシュ改訂番号v0.9.1-1へ更新。旧単色写真の再利用を回避し、既存キャッシュは通常のLRU管理で整理。
-- Akyo PC/Quest FBX/Prefab、ネコメイド FBX/設定済Prefabの6経路で、本番解決処理のみの材質GUID選択・テクスチャ描画が成功。
-- Fuzzy/LuchikaのFBX・Prefabも表示確認済み。ユーザーデータ/検証画像はartifacts配下のみ、配布しない。
-- Core 53件、WPF UIと親探索/近傍優先/Local制限/GUID優先/命名/Prefab補完/競合・差分拒否の回帰検証が成功。
-- 詳細解析はDocuments/TextureReferenceAnalysis-2026-11-16.md。修正後画像はartifacts/texture-fixed-v0.9.1/。
-完了：自己完結型publish、配布workerスモーク、Stable ZIP/SHA256・ライセンス/ユーザーデータ非混入確認。次段階：Prefab配置/Bone/BlendShape/インスタンス差分の表示範囲拡張。
-
+現在の作業：v0.10.0（2026-11-16）完了
+- 選択Prefab依存グラフ、UnityモデルID/入れ子ID/stripped参照を用いた材質・有効状態の差分を実装。
+- Unicodeエスケープ名、Material/Mat配置、Variant継承を追加。曖昧候補と未知IDは推測せず警告。
+- FUWATTO通常9材質/黒Variant11材質を全解決。27メッシュ・44,886三角形を維持。haneの不一致IDの差分1警告を残す。
+- 実UIはパッケージ警告427件＋参照警告1件＋情報1件。ライブ/キャッシュ表示と受動通知を確認。
+- Core 53件、WPF UI、新しいID/Variant/非表示/フォルダー競合の確認成功。
+- Akyo PC/Quest、ネコメイド6経路とFuzzy/LuchikaのFBX・Prefab表示成功。
+- HelpライセンスにSystem.IO.Hashing 10.0.0を追加。キャッシュ改訂v0.10.0-1。README/仕様/開発/調査/履歴更新済み。
+- Release publish・同梱workerスモーク成功。StableにZIP/SHA256作成、414項目のライセンスとユーザーデータ非混入を確認。
+- 残る制約：Prefab配置・Bone姿勢・BlendShape・追加/削除Component・ParticleSystem・Unity Shaderの完全再現は未対応。

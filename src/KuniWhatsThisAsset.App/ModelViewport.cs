@@ -60,7 +60,7 @@ public sealed class ModelViewport : Grid
         ClearModel();
         pictures = cached.Pictures.Select(p => ImagePreviewDecoder.Decode(p, "cache.png")).ToArray(); cachedPicture.Source = pictures[0]; reopen = renderAgain;
         viewport.Visibility = reset.Visibility = Visibility.Collapsed; gallery.Visibility = Visibility.Visible;
-        info.Text = $"レンダリングキャッシュ · {cached.Statistics.TriangleCount:N0}ポリゴン（三角形）\n正面 / 側面 / 平面の透過写真。「3D表示」で再解析・描画します。\n" + string.Join("\n", cached.Notes);
+        info.Text = $"レンダリングキャッシュ · {cached.Statistics.TriangleCount:N0}ポリゴン（三角形）\n正面 / 側面 / 平面の透過写真。「3D表示」で再解析・描画します。";
     }
     public byte[][] CaptureViews()
     {
@@ -106,7 +106,7 @@ public sealed class ModelViewport : Grid
         content.Children.Add(new DirectionalLight(Color.FromRgb(45, 45, 45), new Vector3D(-1, -2, -3)));
         content.Freeze(); scene = content; viewport.Children.Add(new ModelVisual3D { Content = content });
         var s = model.Statistics;
-        info.Text = $"頂点 {s.VertexCount:N0} / ポリゴン（三角形） {s.TriangleCount:N0}\nMesh {s.MeshCount:N0} / 依存Material {s.MaterialCount:N0} / Bone {s.BoneCount:N0} / Skin {(s.HasSkinning ? "あり" : "なし")}\n左ドラッグ: 回転 · 右/中ドラッグ: 移動 · ホイール: ズーム\n" + string.Join("\n", model.Notes);
+        info.Text = $"頂点 {s.VertexCount:N0} / ポリゴン（三角形） {s.TriangleCount:N0}\nMesh {s.MeshCount:N0} / 依存Material {s.MaterialCount:N0} / Bone {s.BoneCount:N0} / Skin {(s.HasSkinning ? "あり" : "なし")}\n左ドラッグ: 回転 · 右/中ドラッグ: 移動 · ホイール: ズーム";
         Reset();
     }
     private void Reset() { yaw = 0; pitch = 0; pan = new(); distance = 3.1; UpdateCamera(); }

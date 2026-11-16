@@ -23,12 +23,8 @@ public partial class MainWindow : Window
     }
     private void Notify(IReadOnlyList<Finding> findings)
     {
-        FindingsGrid.ItemsSource = findings.OrderByDescending(f => f.Severity).ToArray();
-        NoticeTitle.Text = $"⚠ 要確認 {findings.Count:N0}件 — クリックして確認";
-        SecurityNotice.IsExpanded = false;
-        SecurityNotice.Visibility = findings.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        Warning_Collapsed(this, new RoutedEventArgs());
-        if (warningWindow != null) { if (findings.Count == 0) warningWindow.Hide(); else warningWindow.Show(); }
+        packageFindings = findings.ToArray();
+        RefreshWarnings(resetExpansion: true);
     }
     private async Task LoadPackage(string path)
     {
@@ -38,6 +34,7 @@ public partial class MainWindow : Window
         using var cts = new CancellationTokenSource();
         scanCancellation = cts;
         StopImagePreview(); StopModelPreview();
+        ClearPreviewFindings();
         report = null;
         history.Clear(); historyIndex = -1; UpdateNavigation();
         PackageTree.Items.Clear(); fileNodes.Clear();
@@ -136,7 +133,7 @@ public partial class MainWindow : Window
     private void Tree_Changed(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (PackageTree.SelectedItem is not TreeViewItem { Tag: PackageItem item })
-        { StopImagePreview(); StopModelPreview(); Preview.Visibility = Visibility.Collapsed; PreviewHint.Text = ""; return; }
+        { StopImagePreview(); StopModelPreview(); ClearPreviewFindings(); Preview.Visibility = Visibility.Collapsed; PreviewHint.Text = ""; return; }
         ShowItem(item);
     }
     private void ShowItem(PackageItem item)
@@ -147,6 +144,7 @@ public partial class MainWindow : Window
             history.Add(item); historyIndex = history.Count - 1;
         }
         StopImagePreview(); StopModelPreview();
+        ClearPreviewFindings();
         Preview.Text = item.TextPreview ?? "";
         Preview.Visibility = item.TextPreview == null ? Visibility.Collapsed : Visibility.Visible;
         PreviewHint.Text = item.TextPreview == null ? "この形式のプレビューは未対応です。\nFBX・OBJ・Prefabはモデルプレビューに対応しています。" : "";
@@ -176,8 +174,12 @@ public partial class MainWindow : Window
     private void Finding_Selected(object sender, SelectionChangedEventArgs e)
     {
         if (report == null || FindingsGrid.SelectedItem is not Finding finding) return;
-        var item = report.Items.FirstOrDefault(i => i.Findings.Contains(finding));
-        if (item != null) SelectItem(item);
+        var item = report.Items.FirstOrDefault(i => i.Findings.Contains(finding) || i.Path.Equals(finding.Path, StringComparison.OrdinalIgnoreCase));
+        if (item != null)
+        {
+            if (fileNodes.TryGetValue(item.Path, out var node) && node.IsSelected) node.BringIntoView();
+            else SelectItem(item);
+        }
     }
     private async void OnDrop(object sender, DragEventArgs e) { if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: 1 } paths) await LoadPackage(paths[0]); }
     private void OnDragOver(object sender, DragEventArgs e) { e.Effects = scanCancellation == null && e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; }

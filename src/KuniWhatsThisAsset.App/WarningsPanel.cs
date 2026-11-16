@@ -1,11 +1,36 @@
 using System.Windows;
 using System.Windows.Controls;
+using KuniWhatsThisAsset.Core;
 
 namespace KuniWhatsThisAsset.App;
 public partial class MainWindow
 {
     private Window? warningWindow;
     private double warningHeight = 200;
+    private IReadOnlyList<Finding> packageFindings = [];
+    private IReadOnlyList<Finding> previewFindings = [];
+
+    private void RefreshWarnings(bool resetExpansion = false)
+    {
+        var all = packageFindings.Concat(previewFindings).Distinct().OrderByDescending(f => f.Severity)
+            .ThenByDescending(f => f.Code.StartsWith("PREVIEW_", StringComparison.Ordinal)).ToArray();
+        FindingsGrid.ItemsSource = all;
+        int warnings = all.Count(f => f.Severity >= Severity.Warning), info = all.Length - warnings;
+        NoticeTitle.Text = $"⚠ 要確認 {warnings:N0}件" + (info > 0 ? $" / 情報 {info:N0}件" : "") + " — クリックして確認";
+        SecurityNotice.Visibility = warnings > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (resetExpansion || warnings == 0) SecurityNotice.IsExpanded = false;
+        if (!SecurityNotice.IsExpanded) Warning_Collapsed(this, new RoutedEventArgs());
+        if (warningWindow != null) { if (warnings == 0) warningWindow.Hide(); else warningWindow.Show(); }
+    }
+    private void ClearPreviewFindings() { previewFindings = []; RefreshWarnings(); }
+    private void SetPreviewNotes(PackageItem item, IEnumerable<string> notes)
+    {
+        previewFindings = PreviewDiagnostics.FromNotes(item.Path, notes); RefreshWarnings();
+    }
+    private void AddPreviewFailure(PackageItem item, string code, string message)
+    {
+        previewFindings = previewFindings.Append(new Finding(Severity.Warning, code, item.Path, message)).Distinct().ToArray(); RefreshWarnings();
+    }
 
     private void Warning_Expanded(object sender, RoutedEventArgs e)
     {

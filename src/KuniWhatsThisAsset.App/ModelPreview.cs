@@ -15,6 +15,7 @@ public partial class MainWindow
     private Task ShowModelAsync(PackageItem item, PackageReport source, ScanLimits limits, Func<ModelStatistics, bool>? confirm = null) => ShowModelCoreAsync(item, source, limits, confirm, true);
     private async Task ShowModelCoreAsync(PackageItem item, PackageReport source, ScanLimits limits, Func<ModelStatistics, bool>? confirm, bool useCache)
     {
+        ClearPreviewFindings();
         using var cts = new CancellationTokenSource(); modelCancellation = cts;
         PreviewHint.Text = "モデルを解析中…";
         try
@@ -30,6 +31,7 @@ public partial class MainWindow
                     if (cached != null)
                     {
                         ModelView.ShowCached(cached, () => { StopModelPreview(); _ = ShowModelCoreAsync(item, source, limits, confirm, false); });
+                        SetPreviewNotes(item, cached.Notes);
                         ModelView.Visibility = Visibility.Visible; PreviewHint.Text = ""; Status.Text = item.Name + " · レンダリングキャッシュ"; return;
                     }
                 }
@@ -100,20 +102,26 @@ public partial class MainWindow
             model = model with { Notes = model.Notes.Concat(materialResult.Notes).Distinct().Take(100).ToArray() };
             cts.Token.ThrowIfCancellationRequested();
             ModelView.SetModel(model, materialResult.Materials); ModelView.Visibility = Visibility.Visible; PreviewHint.Text = "";
+            SetPreviewNotes(item, model.Notes);
             Status.Text = $"{item.Name} · {stats.TriangleCount:N0}ポリゴン（三角形） · Material {stats.MaterialCount:N0}";
             try
             {
                 var pictures = ModelView.CaptureViews();
                 var entry = new CachedRender(stats, pictures, model.Notes);
                 bool saved = await Task.Run(() => { cts.Token.ThrowIfCancellationRequested(); return cache.Write(cacheKey, entry, preferences); }, cts.Token);
-                if (!cts.IsCancellationRequested && !saved) Status.Text += " · 写真がキャッシュ上限を超えるため保存を省略";
+                if (!cts.IsCancellationRequested && !saved) AddPreviewFailure(item, "PREVIEW_CACHE", "写真一式がキャッシュ容量の上限を超えるため、保存を省略しました。");
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { if (!cts.IsCancellationRequested) Status.Text += " · キャッシュ保存不可: " + ex.Message; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            { if (!cts.IsCancellationRequested) AddPreviewFailure(item, "PREVIEW_CACHE", "レンダリングキャッシュを保存できません: " + ex.Message); }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or InvalidOperationException or NotSupportedException or System.Text.Json.JsonException or System.ComponentModel.Win32Exception or System.Text.RegularExpressions.RegexMatchTimeoutException)
         {
-            if (!cts.IsCancellationRequested) PreviewHint.Text = "モデルを表示できません。\n" + ex.Message;
+            if (!cts.IsCancellationRequested)
+            {
+                AddPreviewFailure(item, "PREVIEW_MODEL_FAILED", ex.Message);
+                PreviewHint.Text = "モデルを表示できません。警告欄を確認してください。";
+            }
         }
         finally { if (ReferenceEquals(modelCancellation, cts)) modelCancellation = null; }
     }

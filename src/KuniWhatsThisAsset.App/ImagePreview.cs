@@ -15,6 +15,7 @@ public partial class MainWindow
     }
     private async Task ShowImageAsync(PackageItem item, PackageReport source, ScanLimits limits)
     {
+        ClearPreviewFindings();
         using var cts = new CancellationTokenSource();
         imageCancellation = cts;
         PreviewHint.Text = "画像を読み込み中…";
@@ -37,7 +38,11 @@ public partial class MainWindow
         catch (OperationCanceledException) { }
         catch (Exception ex) when (ex is FormatException or InvalidOperationException or IOException or InvalidDataException or NotSupportedException or ArgumentException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException or System.Text.RegularExpressions.RegexMatchTimeoutException)
         {
-            if (!cts.IsCancellationRequested) PreviewHint.Text = "画像を表示できません。\n" + ex.Message;
+            if (!cts.IsCancellationRequested)
+            {
+                AddPreviewFailure(item, "PREVIEW_IMAGE_FAILED", ex.Message);
+                PreviewHint.Text = "画像を表示できません。警告欄を確認してください。";
+            }
         }
         finally { if (ReferenceEquals(imageCancellation, cts)) imageCancellation = null; }
     }

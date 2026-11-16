@@ -9,8 +9,11 @@ internal static class Program
     [STAThread]
     private static int Main()
     {
+        if (Environment.GetCommandLineArgs().Contains("--fuwatto-bindings")) return ReferenceChecks.Actual();
         if (Environment.GetCommandLineArgs().Contains("--real-models")) return RealModelChecks.Run();
         if (Environment.GetCommandLineArgs().Contains("--texture-models")) return TextureModelChecks.Run();
+        if (Environment.GetCommandLineArgs().Contains("--fuwatto-analysis")) return FuwattoChecks.Run();
+        if (Environment.GetCommandLineArgs().Contains("--model-ids")) return ModelIdProbe.Run();
         var app = new App(); app.InitializeComponent();
         var main = new MainWindow(System.IO.Path.GetFullPath("artifacts/ui-profile-" + Guid.NewGuid().ToString("N")));
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
@@ -104,7 +107,7 @@ internal static class Program
             Check(imageView.Source == null && imageView.Visibility == Visibility.Collapsed && Field<TextBox>("Preview").Text == "説明文", "Switch from image to text failed");
             Console.WriteLine("PASS package selection -> image preview -> text selection");
             var licenses = LicenseWindow.LoadLicenses();
-            Check(licenses.Count == 6 && licenses.All(l => l.Text.Length > 100), "License text missing");
+            Check(licenses.Count == 7 && licenses.All(l => l.Text.Length > 100), "License text missing");
             Check(licenses.Any(l => l.Text.Contains("MICROSOFT SOFTWARE LICENSE TERMS")), "Distribution license missing");
             var licenseWindow = new LicenseWindow { Owner = main };
             licenseWindow.Show();
@@ -260,7 +263,8 @@ internal static class Program
             Console.WriteLine("PASS package MTL pre-render warning with approval and Unity meta references with refusal");
             ModelMaterialChecks.Run();
             MaterialResolverChecks.Run();
-            FeatureChecks.Run(main);
+            FeatureChecks.Run(main); ReferenceChecks.Run();
+            WarningIntegrationChecks.Run(main);
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }

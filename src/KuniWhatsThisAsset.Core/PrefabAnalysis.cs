@@ -3,10 +3,16 @@ using System.Text.RegularExpressions;
 namespace KuniWhatsThisAsset.Core;
 public sealed record UnityReference(string FileId, string Guid);
 public sealed record PrefabObject(int ClassId, string Id, string Text);
-public sealed record PrefabRenderer(string Name, UnityReference Mesh, string[] Materials, bool Enabled);
-public sealed record PrefabInstance(UnityReference Source, string Text);
-public sealed record PrefabAnalysis(PrefabRenderer[] Renderers, PrefabInstance[] Instances, string[] RootIds, bool RootActive, int ScriptCount)
+public sealed record PrefabRenderer(string Name, UnityReference Mesh, string[] Materials, bool Enabled, string Id = "", string GameObjectId = "");
+public sealed record PrefabInstance(UnityReference Source, string Text, string Id = "");
+public sealed record PrefabModification(UnityReference Target, string Property, string Value, UnityReference Reference);
+public sealed record PrefabAnalysis(PrefabRenderer[] Renderers, PrefabInstance[] Instances, string[] RootIds, bool RootActive, int ScriptCount, PrefabObject[]? Objects = null)
 {
+    public static string DecodeName(string value)
+    {
+        if (value.StartsWith('"')) { try { return System.Text.Json.JsonSerializer.Deserialize<string>(value) ?? value; } catch (System.Text.Json.JsonException) { return value; } }
+        return value.StartsWith('\'') && value.EndsWith('\'') ? value[1..^1].Replace("''", "'") : value;
+    }
     public static MatchCollection Matches(string text, string pattern) => Regex.Matches(text, pattern, RegexOptions.Multiline | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(2));
     public static string Scalar(string text, string field) => Matches(text, @"^  " + Regex.Escape(field) + @": ([^\r\n]*)").Cast<Match>().FirstOrDefault()?.Groups[1].Value.Trim() ?? "";
     public static UnityReference Reference(string text, string field)
@@ -47,12 +53,15 @@ public sealed record PrefabAnalysis(PrefabRenderer[] Renderers, PrefabInstance[]
             string go = Reference(renderer.Text, "m_GameObject").FileId;
             var mesh = renderer.ClassId == 137 ? Reference(renderer.Text, "m_Mesh") : Reference(filters.GetValueOrDefault(go)?.Text ?? "", "m_Mesh");
             string materials = Matches(renderer.Text, @"^  m_Materials:\s*\r?\n((?:  - [^\r\n]*\r?\n)*)").Cast<Match>().FirstOrDefault()?.Groups[1].Value ?? "";
-            string name = objects.TryGetValue(go, out var obj) ? Scalar(obj.Text, "m_Name").Trim('"', '\'') : "";
-            renderers.Add(new(name, mesh, Matches(materials, @"^  - \{([^}]+)\}").Select(m => ParseReference(m.Groups[1].Value).Guid).ToArray(), Active(go) && Scalar(renderer.Text, "m_Enabled") != "0"));
+            string name = objects.TryGetValue(go, out var obj) ? DecodeName(Scalar(obj.Text, "m_Name")) : "";
+            renderers.Add(new(name, mesh, Matches(materials, @"^  - \{([^}]+)\}").Select(m => ParseReference(m.Groups[1].Value).Guid).ToArray(), Active(go) && Scalar(renderer.Text, "m_Enabled") != "0", renderer.Id, go));
         }
         var roots = transforms.Where(t => Reference(t.Value.Text, "m_Father").FileId == "0").Select(t => t.Key).ToArray();
-        return new(renderers.ToArray(), documents.Where(d => d.ClassId == 1001).Select(d => new PrefabInstance(Reference(d.Text, "m_SourcePrefab"), d.Text)).Where(i => i.Source.Guid.Length > 0).ToArray(), roots, roots.Length == 0 || roots.Any(Active), documents.Count(d => d.ClassId == 114));
+        return new(renderers.ToArray(), documents.Where(d => d.ClassId == 1001).Select(d => new PrefabInstance(Reference(d.Text, "m_SourcePrefab"), d.Text, d.Id)).Where(i => i.Source.Guid.Length > 0).ToArray(), roots, roots.Length == 0 || roots.Any(Active), documents.Count(d => d.ClassId == 114), documents);
     }
+    public static PrefabModification[] Modifications(PrefabInstance instance) => Matches(instance.Text,
+        @"^[ \t]*- target: \{([^}]+)\}[ \t]*\r?\n[ \t]+propertyPath: ([^\r\n]+)\r?\n[ \t]+value:([^\r\n]*)\r?\n[ \t]+objectReference: \{([^}]+)\}")
+        .Select(m => new PrefabModification(ParseReference(m.Groups[1].Value), m.Groups[2].Value.Trim(), m.Groups[3].Value.Trim(), ParseReference(m.Groups[4].Value))).ToArray();
     public static bool? RootActiveOverride(PrefabInstance instance, string[] rootIds)
     {
         bool? active = null;

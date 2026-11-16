@@ -122,3 +122,25 @@ ModelMaterials.LoadDetailedで未解決・画像デコード失敗の説明を�
 通常UIテストに親探索・Local制限・近傍優先・GUID優先・命名・Prefab補完・競合拒否を追加。--texture-modelsでユーザー提供のAkyo/ネコメイドの6経路を、本番の解決処理のみで検証できる。
 
 参考：[Unityの列挙値定義](https://github.com/Unity-Technologies/UnityCsReference/blob/master/Modules/AssetPipelineEditor/Public/ModelImporting/ModelImporter.bindings.cs)、[親方向のMaterials探索](https://docs.unity3d.com/ja/6000.0/ScriptReference/ModelImporterMaterialSearch.RecursiveUp.html)
+
+## v0.9.2 診断表示の統合
+
+PreviewDiagnosticsがモデルとキャッシュのNotesをFindingへ変換する。表示上の一般的な制限はInfo、参照不成立はWarningとして扱う。元材質の具体的な理由がある場合は、旧キャッシュに含まれるGUID付きの汎用二次エラーを除く。
+
+MainWindowはpackageFindingsとpreviewFindingsを分けて保持し、警告欄へ結合する。選択変更ではpreviewFindingsのみ消去する。非同期の画像/モデル処理はキャンセル状態を確認してから診断を反映し、古い選択の結果を残さない。警告更新では展開中の状態を維持し、別ウィンドウも同じItemsSourceを共有する。
+
+ModelViewportはNotesを描画せず、統計・操作案内のみを表示する。写真にはもともと注記が含まれないためRenderCacheの描画改訂番号は維持する。キャッシュ再表示でもNotesを警告欄へ復元する。モデル/画像の例外は短い案内と警告欄の詳細へ分け、キャッシュ保存失敗も同欄へ送る。
+
+80件の注記、パッケージ警告保持、重複抑制、情報のみの非表示、分離ウィンドウ、表示失敗をWPFテストで検証。--fuwatto-analysisでRドライブ上の指定パッケージを使い、実際の大量注記とライブ/キャッシュ表示を検証できる。通常テストに実アセットは不要。
+
+## v0.10.0 Prefab参照拡張
+
+PrefabPreviewBuilderは選択アセットからPrefabInstanceと直接Rendererの参照を列挙し、依存層ごとにReadAssetSetで一括読み込む。依存Prefab32種類・合計64 MiB、深さ8・訪問64を上限にする。関係するFBX/OBJのみを最大16件・一括512 MiBで取得し、metaは一括32 MiBまでとする。循環・未知形式・参照欠落を明示する。
+
+ModelImporterは各メッシュの元NodePath・MeshName・Skinnedをworker JSONに含める。UnityModelIdsはSystem.IO.HashingのXXH64（seed 0）でUnityのType識別子を生成する。Prefabの直接Mesh IDを優先し、名前による補完は一つのNodePathに限る。二義的な割り当ては省略する。PrefabAnalysisはオブジェクトID、インスタンスID、対象/属性/値/参照の差分を保持し、日本語名のJSON互換エスケープを復号する。
+
+材質・Renderer有効状態・GameObject有効状態を内部Partへ適用する。子の結果に対する上位Variantの指定を優先し、入れ子のXOR IDとstrippedの明示IDを親の名前空間へ公開する。最終の可視Partで材質GUIDを確定するため、上書き前の未解決材質を誤警告しない。無関係な全Prefabを使った材質推測をPrefab選択時には行わない。裸のFBX/OBJの従来の逆引き上限は維持する。
+
+未知IDの差分は対象GUID/ID単位で警告へまとめる。配置・Bone姿勢・BlendShape・追加/削除Component・ParticleSystemは静止近似の範囲外。RenderCacheの改訂番号はv0.10.0-1へ更新する。
+
+通常UIテストでUnicode名、Unity既知ID、入れ子Variant、材質上書き、非表示、未知ID、Material/Mat競合を検証。--fuwatto-bindingsで通常/黒Variantの全材質参照を確認し、--fuwatto-analysisでライブ/キャッシュ表示と残存警告1件・通常情報1件を確認。指定された実データを使うオプション検証は配布物に含めない。

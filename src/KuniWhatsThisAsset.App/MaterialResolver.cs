@@ -26,7 +26,7 @@ public sealed class MaterialResolver(PackageReader reader, PackageReport report,
     public static string MeshNodeName(string metadata, PrefabRenderer renderer) => PrefabAnalysis.Matches(metadata,
         @"^    " + Regex.Escape(renderer.Mesh.FileId) + @": ([^\r\n]+)").FirstOrDefault() is { } match ? Name(match.Groups[1].Value) : renderer.Name;
 
-    public MaterialResolution Resolve(PackageItem modelItem, string metadata, ModelPreviewData model)
+    public MaterialResolution Resolve(PackageItem modelItem, string metadata, ModelPreviewData model, bool allowPrefabInference = true)
     {
         var selected = new Dictionary<string, PackageItem>(StringComparer.Ordinal);
         var issues = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -64,8 +64,8 @@ public sealed class MaterialResolver(PackageReader reader, PackageReport report,
                 {
                     while (directory.Length > 0)
                     {
-                        string folder = directory + "/Materials";
-                        candidates = matching.Where(i => DirectoryOf(i.Path).Equals(folder, StringComparison.OrdinalIgnoreCase)).ToArray();
+                        var folders = new[] { directory + "/Materials", directory + "/Material", directory + "/Mat" };
+                        candidates = matching.Where(i => folders.Contains(DirectoryOf(i.Path), StringComparer.OrdinalIgnoreCase)).ToArray();
                         if (candidates.Length > 0 || search != 1 || directory.Equals("Assets", StringComparison.OrdinalIgnoreCase)) break;
                         directory = DirectoryOf(directory);
                     }
@@ -80,7 +80,7 @@ public sealed class MaterialResolver(PackageReader reader, PackageReport report,
             }
             if (candidates.Length == 1) { selected[original] = candidates[0]; continue; }
             if (candidates.Length > 1) { Issue("同じ探索範囲に候補が複数あります"); continue; }
-            if (modelItem.Format is ".fbx" or ".obj")
+            if (allowPrefabInference && modelItem.Format is (".fbx" or ".obj"))
             {
                 var inferred = FromPrefabs(modelItem, metadata, model, original, out string? inferenceIssue);
                 if (inferred.Length == 1 && materials.FirstOrDefault(i => i.Guid.Equals(inferred[0], StringComparison.OrdinalIgnoreCase)) is { } item) { selected[original] = item; continue; }

@@ -14,10 +14,10 @@ using KuniWhatsThisAsset.Core;
 internal static class FeatureChecks
 {
     private const BindingFlags Flags = BindingFlags.NonPublic | BindingFlags.Instance;
-    public static void Pump(Task task)
+    public static void Pump(Task task, double seconds = 50)
     {
         var frame = new DispatcherFrame(); var clock = System.Diagnostics.Stopwatch.StartNew();
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) }; timer.Tick += (_, _) => { if (task.IsCompleted || clock.Elapsed.TotalSeconds > 50) frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame); timer.Stop();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) }; timer.Tick += (_, _) => { if (task.IsCompleted || clock.Elapsed.TotalSeconds > seconds) frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame); timer.Stop();
         if (!task.IsCompleted) throw new Exception("Feature timed out"); task.GetAwaiter().GetResult();
     }
     public static void Run(MainWindow main)

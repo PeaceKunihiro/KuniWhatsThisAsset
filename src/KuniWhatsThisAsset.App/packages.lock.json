@@ -8,6 +8,12 @@
         "resolved": "6.0.12",
         "contentHash": "HdfQ20RqLW32Nf05L0rrJYQlgcFWmQOdIZNDY4SNC0o8485DUzTeXAUMAp3KvUg8rDFIHbzFhvxDVl33WAV7Bg=="
       },
+      "System.IO.Hashing": {
+        "type": "Direct",
+        "requested": "[10.0.0, )",
+        "resolved": "10.0.0",
+        "contentHash": "MqSp5IfX9RdWVwTED0WSRL1kZDNB7GlFj64O/NAJs4uO1beBHWEAFLlC7j8Fw/PkI+SUzooLVNvAe4aEkSwsRg=="
+      },
       "kuniwhatsthisasset.core": {
         "type": "Project"
       }

@@ -4,7 +4,7 @@ public sealed record ModelStatistics(long VertexCount, long TriangleCount, int M
 {
     public bool RequiresLoadWarning => TriangleCount >= 100_000 || MaterialCount >= 10;
 }
-public sealed record PreviewMesh(float[] Positions, float[] Normals, int[] Indices, float[] Color, float[]? UV = null, string MaterialName = "", string NodeName = "", string TexturePath = "");
+public sealed record PreviewMesh(float[] Positions, float[] Normals, int[] Indices, float[] Color, float[]? UV = null, string MaterialName = "", string NodeName = "", string TexturePath = "", string NodePath = "", string MeshName = "", bool Skinned = false);
 public sealed record ModelPreviewData(ModelStatistics Statistics, PreviewMesh[] Meshes, string[] Notes)
 {
     public void Validate()
@@ -17,6 +17,7 @@ public sealed record ModelPreviewData(ModelStatistics Statistics, PreviewMesh[] 
                 throw new InvalidDataException("モデルの配列長が不正です。");
             if (mesh.UV != null && (mesh.UV.Length != mesh.Positions.Length / 3 * 2 || mesh.UV.Any(v => !float.IsFinite(v) || Math.Abs(v) > 1e6))) throw new InvalidDataException("UV座標が不正です。");
             if (mesh.MaterialName.Length > 4096 || mesh.NodeName.Length > 4096 || mesh.TexturePath.Length > 4096) throw new InvalidDataException("モデル名称が長すぎます。");
+            if (mesh.NodePath == null || mesh.NodePath.Length > 16384 || mesh.MeshName == null || mesh.MeshName.Length > 4096) throw new InvalidDataException("モデル階層名が不正です。");
             vertices += mesh.Positions.Length / 3; triangles += mesh.Indices.Length / 3;
             if (vertices > 2_000_000 || triangles > 2_000_000 || mesh.Positions.Any(v => !float.IsFinite(v) || Math.Abs(v) > 1e12f) || mesh.Normals.Any(v => !float.IsFinite(v)) || mesh.Color.Any(v => !float.IsFinite(v) || v < 0 || v > 1) || mesh.Indices.Any(i => i < 0 || i >= mesh.Positions.Length / 3))
                 throw new InvalidDataException("モデルの値・索引・プレビュー容量が不正です。");

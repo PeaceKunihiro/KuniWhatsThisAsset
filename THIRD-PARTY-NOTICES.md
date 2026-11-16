@@ -1,6 +1,6 @@
 # 依存コンポーネント
 
-KuniWhatsThisAsset v0.9.1は.NET 10 / WPFおよびSharpAssimp 6.0.12を使用します。描画は標準WPF Viewport3Dを使用します。Prefab解析・キャッシュ・設定に追加ライブラリは導入していません。
+KuniWhatsThisAsset v0.10.0は.NET 10 / WPFおよびSharpAssimp 6.0.12を使用します。描画は標準WPF Viewport3Dを使用します。Unityモデル識別子のXXH64計算にSystem.IO.Hashing 10.0.0（MIT）を使用します。MIT原文とNuGetパッケージの第三者通知を同梱し、Help→ライセンスに表示します。
 
 SharpAssimpの管理コードはMIT、同梱Assimpネイティブ部分はBSD 3-Clauseです。パッケージに含まれるPoly2Tri等の通知も含めた原文を`licenses/SharpAssimp-LICENSE.txt`へ同梱し、Help→ライセンスで表示します。ソース原本はNuGet 6.0.12のLICENSE.txtです。
 
@@ -24,3 +24,7 @@ SharpAssimpの管理コードはMIT、同梱Assimpネイティブ部分はBSD 3-
 
 
 
+
+
+- [System.IO.Hashing 10.0.0](https://www.nuget.org/packages/System.IO.Hashing/10.0.0)
+- [System.IO.Hashing / .NET Runtimeライセンス](https://github.com/dotnet/runtime/blob/v10.0.0/LICENSE.TXT)

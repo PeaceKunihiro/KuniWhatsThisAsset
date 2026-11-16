@@ -31,6 +31,14 @@ internal static class MaterialResolverChecks
         entries.Add((main, "Assets/Avatar/Materials/Main.mat", "Material:\n"));
         entries.Add((quest, "Assets/Avatar/Materials/Main_Quest.mat", "Material:\n"));
         Check(Resolve(metadata).Selected["Main"].Guid == main, "Sibling Materials was not found");
+        entries[0] = (main, "Assets/Avatar/Material/Main.mat", "Material:\n");
+        Check(Resolve(metadata).Selected["Main"].Guid == main, "Singular Material folder was not found");
+        entries[0] = (main, "Assets/Avatar/Mat/Main.mat", "Material:\n");
+        Check(Resolve(metadata).Selected["Main"].Guid == main, "Mat folder was not found");
+        entries.Add((near, "Assets/Avatar/Material/Main.mat", "Material:\n"));
+        Check(Resolve(metadata).Selected.Count == 0, "Equidistant Material/Mat ambiguity was guessed");
+        entries.RemoveAt(entries.Count - 1);
+        entries[0] = (main, "Assets/Avatar/Materials/Main.mat", "Material:\n");
         var questData = data with { Meshes = [data.Meshes[0] with { MaterialName = "Main_Quest" }] };
         Check(Resolve(metadata, questData).Selected["Main_Quest"].Guid == quest, "PC/Quest material was mixed up");
         Check(Resolve(metadata.Replace("materialSearch: 1", "materialSearch: 0")).Selected.Count == 0, "Local search escaped into parent directory");
