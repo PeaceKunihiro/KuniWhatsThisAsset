@@ -13,7 +13,7 @@ public static class ModelImporter
     public static ModelPreviewData Import(ModelInput input)
     {
         if (input.Bytes.Length > 256 * 1024 * 1024 || input.Dependencies.Count > 32 || input.Dependencies.Values.Sum(b => (long)b.Length) > 32 * 1024 * 1024) throw new InvalidDataException("モデル入力のプレビュー上限を超えています。");
-        var native = Path.Combine(AppContext.BaseDirectory, "Native", "assimp.dll");
+        var native = NativeDependencies.AssimpPath();
         if (!File.Exists(native)) throw new FileNotFoundException("同梱のモデル解析DLLが見つかりません。", native);
         try
         {
@@ -22,7 +22,7 @@ public static class ModelImporter
         }
         catch (Exception ex)
         {
-            throw new InvalidOperationException("モデル解析DLLをロードできません。Microsoft Visual C++ v14 x64ランタイムと、Native/assimp.dllの存在を確認してください。 " + ex.Message, ex);
+            throw new InvalidOperationException("モデル解析DLLをロードできません。Microsoft Visual C++ v14 x64ランタイムと配布ファイルを確認してください。 " + ex.Message, ex);
         }        using var context = new AssimpContext();
         context.SetConfig(new SharpAssimp.Configs.FBXImportAnimationsConfig(false));
         using var io = new VirtualModelIO(input);

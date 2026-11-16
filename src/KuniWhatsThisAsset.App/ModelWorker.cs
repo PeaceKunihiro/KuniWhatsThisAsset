@@ -35,7 +35,7 @@ public static class ModelWorker
     public static async Task<ModelPreviewData> ImportAsync(ModelInput input, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        string assembly = typeof(ModelWorker).Assembly.Location;
+        string assembly = Path.Combine(AppContext.BaseDirectory, "KuniWhatsThisAsset.App.dll");
         string host = Environment.ProcessPath ?? throw new InvalidOperationException("起動元を取得できません。");
         var start = new ProcessStartInfo { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = AppContext.BaseDirectory };
         if (Path.GetFileNameWithoutExtension(host).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
@@ -45,7 +45,7 @@ public static class ModelWorker
             start.ArgumentList.Add("exec"); start.ArgumentList.Add("--runtimeconfig"); start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, entry + ".runtimeconfig.json"));
             start.ArgumentList.Add("--depsfile"); start.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, entry + ".deps.json")); start.ArgumentList.Add(assembly);
         }
-        else start.FileName = Path.ChangeExtension(assembly, ".exe");
+        else start.FileName = Assembly.GetEntryAssembly() == typeof(ModelWorker).Assembly ? host : Path.ChangeExtension(assembly, ".exe");
         start.ArgumentList.Add("--model-worker");
         using var process = Process.Start(start) ?? throw new IOException("解析プロセスを起動できません。");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

@@ -10,6 +10,7 @@ internal static class Program
     private static int Main()
     {
         if (Environment.GetCommandLineArgs().Contains("--fuwatto-bindings")) return ReferenceChecks.Actual();
+        if (Environment.GetCommandLineArgs().Contains("--published-update")) return PublishedUpdateChecks.Run();
         if (Environment.GetCommandLineArgs().Contains("--real-models")) return RealModelChecks.Run();
         if (Environment.GetCommandLineArgs().Contains("--texture-models")) return TextureModelChecks.Run();
         if (Environment.GetCommandLineArgs().Contains("--fuwatto-analysis")) return FuwattoChecks.Run();
@@ -265,7 +266,7 @@ internal static class Program
             Console.WriteLine("PASS package MTL pre-render warning with approval and Unity meta references with refusal");
             ModelMaterialChecks.Run();
             MaterialResolverChecks.Run();
-            FeatureChecks.Run(main); ReferenceChecks.Run(); BindPoseChecks.Run();
+            FeatureChecks.Run(main); ReferenceChecks.Run(); BindPoseChecks.Run(); UpdateUiChecks.Run(main);
             WarningIntegrationChecks.Run(main);
             return 0;
         }

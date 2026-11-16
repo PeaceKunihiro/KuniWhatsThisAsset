@@ -119,3 +119,15 @@
 - キャッシュ改訂をv0.10.1-1へ更新。README/仕様/開発/調査資料を更新。
 - Release発行版のworkerでもSharlenの髪位置とversion=0.10.1.0を確認。ZIPにユーザーアセット/設定/キャッシュが含まれないことを検証。
 - Stable ZIP 69526732 bytes / SHA256 bd020530dfcccc7afc3f55748e4ac48df8c49f70d1061c00dd3f1a169c588af9  KuniWhatsThisAsset-v0.10.1-win-x64.zip
+
+2026-11-16 v0.11.0
+- .NET/WPF/SharpAssimp/Assimpを圧縮単一EXEへ内蔵。発行先直下はEXE/Libs/README.txt/THIRD-PARTY-NOTICES.mdの4項目、ZIP内は11ファイルへ整理。
+- NativeDependenciesが.NETバンドル展開先を扱い、ModelWorkerのAssembly.Location依存を排除。ライセンス原文と配布一覧をLibsへ集約。
+- Aboutに手動更新確認・ダウンロード更新再起動・進捗/状態表示を追加。自動は1日1回、手動は日次制限を解除。
+- GitHub固定URLのZIP/SHA256と、Libs/distribution.jsonの版・個別ハッシュを検証。パス/予約名/リンク/重複/設定混入を拒否。
+- 配布ファイルだけをバックアップして置換し、途中失敗は変更分を復元。設定/履歴/ブックマーク/写真キャッシュと管理外ファイルを保持し、衝突は中止。
+- helperのREADY後にだけ終了し、親PID/開始時刻/実行パスを確認して終了待ち・置換・再起動。解析の終了キャンセルとロック解放待ちにも対応。
+- tools/Publish-Stable.ps1でZIP/SHA256/配布一覧を作成。実際のGitHubアップロードは行っていない。
+- Core 61件、WPF UIの手動/進捗/チェックサム失敗/キャンセル、隔離した発行版の0.10.1→0.11.0置換・WPF画面再起動・設定/キャッシュ保持を確認。
+- 単一EXEの内蔵AssimpでOBJを解析。Sharlen FBXの髪Y=1.1789832～1.65755も維持。公開物にユーザーアセット・設定・キャッシュ・ルートDLL/PDBがないことを確認。
+- 最終ZIP 63652774 bytes / SHA256 941a65a81c2ed587e43490a98f4a9383485d744fa0d8b6407e7cfacc959b5760  KuniWhatsThisAsset-v0.11.0-win-x64.zip

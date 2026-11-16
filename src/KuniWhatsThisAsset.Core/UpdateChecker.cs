@@ -5,6 +5,8 @@ using System.Text.RegularExpressions;
 namespace KuniWhatsThisAsset.Core;
 
 public sealed record AvailableUpdate(Version Version, Uri DownloadUri);
+public enum UpdateCheckStatus { Skipped, UpToDate, Available, Unavailable }
+public sealed record UpdateCheckResult(UpdateCheckStatus Status, AvailableUpdate? Update = null);
 public interface IUpdateAttemptStore { bool TryReserve(DateTimeOffset now); }
 public sealed class FileUpdateAttemptStore(string path) : IUpdateAttemptStore
 {
@@ -46,33 +48,39 @@ public sealed class UpdateChecker(HttpClient client, IUpdateAttemptStore store, 
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KuniWhatsThisAsset", "update-check.json")));
 
     public async Task<AvailableUpdate?> CheckAsync(Version current, CancellationToken cancellationToken = default)
+        => (await CheckDetailedAsync(current, false, cancellationToken).ConfigureAwait(false)).Update;
+    public async Task<UpdateCheckResult> CheckDetailedAsync(Version current, bool manual, CancellationToken cancellationToken = default)
     {
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             // Reserve before sending, including failed/cancelled attempts and concurrent app instances.
-            if (!store.TryReserve((clock ?? (() => DateTimeOffset.Now))())) return null;
+            bool reserved = store.TryReserve((clock ?? (() => DateTimeOffset.Now))());
+            if (!manual && !reserved) return new(UpdateCheckStatus.Skipped);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(5));
             using var request = new HttpRequestMessage(HttpMethod.Get, ApiUri);
             request.Headers.UserAgent.ParseAdd($"KuniWhatsThisAsset/{current.ToString(3)}");
             request.Headers.Accept.ParseAdd("application/vnd.github+json");
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > 1024 * 1024) return null;
+            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentLength > 1024 * 1024) return new(UpdateCheckStatus.Unavailable);
             using var stream = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
             using var memory = new MemoryStream();
             var buffer = new byte[16 * 1024];
             int read;
             while ((read = await stream.ReadAsync(buffer, timeout.Token).ConfigureAwait(false)) != 0)
             {
-                if (memory.Length + read > 1024 * 1024) return null;
+                if (memory.Length + read > 1024 * 1024) return new(UpdateCheckStatus.Unavailable);
                 memory.Write(buffer, 0, read);
             }
             cancellationToken.ThrowIfCancellationRequested();
-            return FindLatest(memory.ToArray(), current);
+            using var document = JsonDocument.Parse(memory.ToArray());
+            if (document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() > 1000) return new(UpdateCheckStatus.Unavailable);
+            var update = FindLatest(memory.ToArray(), current);
+            return new(update == null ? UpdateCheckStatus.UpToDate : UpdateCheckStatus.Available, update);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or JsonException or OperationCanceledException or ArgumentException or RegexMatchTimeoutException)
-        { return null; }
+        { return new(UpdateCheckStatus.Unavailable); }
     }
     public static AvailableUpdate? FindLatest(byte[] json, Version current)
     {

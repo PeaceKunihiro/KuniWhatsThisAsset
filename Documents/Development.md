@@ -152,3 +152,21 @@ ModelImporterは各メッシュの元NodePath・MeshName・Skinnedをworker JSON
 SharlenのHairでは親子の初期回転の累積が-180°になる一方、記録された全体BindPoseはBodyと同じ-90°だった。元FBXの静止姿勢を使うことでFBX直接・4種Prefabの髪位置を修正する。BoneアニメーションやPrefab配置差分の完全対応ではない。RenderCacheはv0.10.1-1へ更新。
 
 BindPoseChecksは7400/7500、圧縮/非圧縮、行列方向、重複名・矛盾姿勢・不正オフセットを検証。--sharlen-modelsでユーザー提供パッケージの5経路と正面/側面を確認し、--sharlen-probeでネイティブ階層・行列を診断できる。詳細：SharlenMeshPosition-2026-11-16.md。
+
+## v0.11.0 単一EXE・自己更新
+
+Windows x64の自己完結型発行ではPublishSingleFile / IncludeNativeLibrariesForSelfExtract / EnableCompressionInSingleFileを有効化する。.NET/WPFと管理依存DLL、Assimp DLLをEXEへ内蔵する。NativeDependenciesはAppContext.BaseDirectoryとランタイムのNATIVE_DLL_SEARCH_DIRECTORIESからLibs/assimp.dllを探す。通常ビルドではLibs/へコピーする。Assembly.Locationには依存せず、ModelWorkerは発行EXE自身を起動する。ライセンス原文は本体とLibs/licensesの双方に保持する。
+
+Aboutの自動確認は日次予約を維持し、明示操作はCheckDetailedAsync(manual:true)で予約結果に関わらず問い合わせる。手動結果はAvailable/UpToDate/Unavailableを表示する。画面を閉じるとダウンロードを中止し、非同期の古い結果を反映しない。自己更新はsingle-file配布版のみで有効。
+
+UpdateDownloaderはGitHubの固定raw URLから同版ZIPとSHA256を取得する。別ホスト・リダイレクト・不正な版/チェックサムを受け入れない。10分・512 MiB上限、ZIPは1024項目以内、配布ファイルは512個・個別512 MiB・合計1 GiBまで。Libs/distribution.json（Schema=1、Version、FilesのPath/Length/Sha256）を必須とする。既知の本体/説明書とLibsのDLL/ライセンスだけを許可し、設定JSON・予約名・パス逸脱・リンク・重複を拒否する。
+
+更新用フォルダーをユーザー別Updates/<GUID>に作り、全ファイルを検証してから、現在の単一EXEをupdater.exeへコピーして--apply-update plan.jsonを起動する。helperは対象と親PID/開始時刻/実行パスを検証し、READYを返す。本体はREADY後にのみ終了する。helperは親の終了を最大60秒待ち、排他ロック、バックアップ、ファイル単位の一時コピーと置換、再検証を行って再起動する。終了時には解析をキャンセルし、短いファイルロック解放遅延にも再試行する。
+
+更新対象は配布一覧に限定する。既存の管理外ファイルとの衝突は中止し、古い配布ファイルは旧ハッシュに一致するものだけ整理する。設定/履歴/ブックマーク/写真キャッシュの保存先は変更しない。途中失敗は変更した順の逆で復元し、復元失敗も作業場所とともに明示する。成功して新しい画面が起動した後、Updates直下のGUIDフォルダーかつリンクを含まない作業だけを削除する。失敗時のバックアップは保持する。電源断等のプロセス外障害に対する完全なトランザクションは保証しない。
+
+tools/Publish-Stable.ps1（PowerShell 7）がクリーンなartifacts発行先、README、個別ハッシュの配布一覧、StableのZIPとSHA256を作る。公開時には同版ZIPと.sha256の両方をGitHub Stableへ置く。配布一覧はZIP内のLibsに含まれる。旧版の大量DLLを残さないため、0.11.0への初回切替は新しいフォルダーへ展開する。
+
+Coreの追加8検証で手動制限、HTTP/ハッシュ失敗、キャンセル、不正ZIP、設定維持、ロールバック、管理外ファイル衝突を確認。WPFでは手動/進捗/失敗復帰/閉じるキャンセルを確認。--published-updateは0.10.1発行版とStableの0.11.0 ZIPを使い、実helperが旧workerの終了を待って更新し、新しいWPFウィンドウを起動して設定/キャッシュを保つことを隔離フォルダー内で検証する。
+
+参考：[.NET single-file公式資料](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)、[GitHub Contents API](https://docs.github.com/en/rest/repos/contents#get-repository-content)

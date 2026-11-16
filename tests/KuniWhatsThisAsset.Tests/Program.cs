@@ -339,6 +339,7 @@ Test("Prefab parser rejects binary and resolves inactive ancestors", () =>
     string text = "%YAML 1.1\n--- !u!1 &1\nGameObject:\n  m_Name: root\n  m_IsActive: 0\n--- !u!4 &2\nTransform:\n  m_GameObject: {fileID: 1}\n  m_Father: {fileID: 0}\n--- !u!1 &3\nGameObject:\n  m_Name: child\n  m_IsActive: 1\n--- !u!4 &4\nTransform:\n  m_GameObject: {fileID: 3}\n  m_Father: {fileID: 2}\n--- !u!137 &5\nSkinnedMeshRenderer:\n  m_GameObject: {fileID: 3}\n  m_Enabled: 1\n  m_Mesh: {fileID: 4300000, guid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, type: 3}\n";
     var prefab = PrefabAnalysis.Parse(text); Check(!prefab.RootActive && !prefab.Renderers[0].Enabled, "Inactive ancestor ignored");
 });
+SelfUpdateChecks.Run(output, Test, Check);
 Console.WriteLine($"\n{passed} passed, {failed} failed. Fixtures: {output}");
 return failed == 0 ? 0 : 1;
 

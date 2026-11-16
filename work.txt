@@ -1,9 +1,10 @@
-現在の作業：v0.10.1（2026-11-16）完了
-- SharlenのHair位置ずれを修正。スキン付きバイナリFBXの静止BindPoseを優先し、親子の初期回転の累積差を回避。
-- 32/64bitヘッダー、圧縮/非圧縮行列を範囲制限付きで解析。矛盾姿勢・重複名は採用しない。通常/ASCII/姿勢なし/Geometric補助経路は従来変換。
-- FBX/通常/FT/alt/alt2の5経路と正面・側面画像、発行版workerで髪の位置が頭へ戻ることを確認。
-- Core 53件、UI、バインド解析の回帰検証が成功。Fuzzy/Luchika・Akyo PC/Quest・ネコメイドも確認。
-- 旧FUWATTO入力は現在Rに存在しないため、今回の版での再表示は未実施。
-- キャッシュ改訂v0.10.1-1で旧写真を再生成。README/仕様/開発/調査資料更新済み。
-- Release・Stable ZIP/SHA256作成完了。ライセンス/DLL保持とユーザーデータ非混入を確認。
-- 詳細：Documents/SharlenMeshPosition-2026-11-16.md。アニメーション/Bone変形・Prefab配置差分の完全再現は未対応。
+現在の作業：v0.11.0（2026-11-16）完了
+- .NET/WPF/SharpAssimp/Assimpを圧縮単一EXEへ内蔵。直下4項目、ZIP内11ファイル。残存文書/配布一覧はLibsへ。
+- Aboutに手動更新確認とダウンロード自己更新・再起動・進捗を追加。自動の日次制限は維持し、手動は解除。
+- 固定GitHub URL、ZIP SHA256、Libs/distribution.jsonの版と個別ハッシュを検証。未知形式/パス逸脱/リンク/設定混入を拒否。
+- 配布対象だけをバックアップ/置換/失敗時復元。ユーザー設定/履歴/ブックマーク/キャッシュと管理外ファイルは保持。
+- helper READY、親の識別/終了待ち、ロック解放待ち、新版起動後の作業整理に対応。終了時の解析キャンセルも実装。
+- Core 61件とUI、発行版の実プロセス0.10.1→0.11.0置換/新版WPF起動/設定保持を検証。単一EXEのモデルworkerも成功。
+- Stable ZIP/SHA256とLibs配布一覧を作成。README/仕様/更新履歴/開発/更新設計を更新。公開物にテストデータは含まない。
+- GitHubへの公開・アップロードは未実施。公開時は同版ZIPと.sha256をStableへセットで配置する。
+- 最終発行フォルダー：artifacts/KuniWhatsThisAsset-v0.11.0-win-x64-final3。再発行はtools/Publish-Stable.ps1へ新しいartifacts出力先を指定する。

@@ -15,7 +15,7 @@ internal static class SharlenChecks
             var bytes=reader.ReadAssetBytes(report.SourcePath,item.Guid);
             File.WriteAllBytes("artifacts/sharlen-analysis/Sharlen.fbx",bytes);
             var input=new ModelInput(item.Path,bytes,new());
-            SharpAssimp.Unmanaged.AssimpLibrary.Instance.LoadLibrary(Path.Combine(AppContext.BaseDirectory,"Native/assimp.dll"));
+            SharpAssimp.Unmanaged.AssimpLibrary.Instance.LoadLibrary(NativeDependencies.AssimpPath());
             using var context=new AssimpContext(); context.SetConfig(new SharpAssimp.Configs.FBXImportAnimationsConfig(false)); using var io=new VirtualModelIO(input); context.SetIOSystem(io);
             var scene=context.ImportFile(io.MainPath,PostProcessSteps.Triangulate|PostProcessSteps.GenerateSmoothNormals|PostProcessSteps.JoinIdenticalVertices|PostProcessSteps.ValidateDataStructure);
             var globals=new Dictionary<string,Matrix4x4>(); var nodes=new List<object>(); var meshNodes=new List<(Node Node,Matrix4x4 World)>();

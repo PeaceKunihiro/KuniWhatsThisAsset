@@ -19,6 +19,7 @@ public partial class MainWindow
     {
         preferenceStore = new(profileDirectory); preferences = preferenceStore.Read();
         InitializeComponent();
+        Closed += (_, _) => { scanCancellation?.Cancel(); StopImagePreview(); StopModelPreview(); bookmarkTimer.Stop(); };
         bookmarkTimer.Interval = TimeSpan.FromMilliseconds(GetDoubleClickTime());
         bookmarkTimer.Tick += (_, _) => { bookmarkTimer.Stop(); ChangeBookmark(true, pendingBookmarkDirectory); pendingBookmarkDirectory = null; };
         var args = Environment.GetCommandLineArgs();
