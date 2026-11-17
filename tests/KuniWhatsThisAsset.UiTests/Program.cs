@@ -27,6 +27,8 @@ internal static class Program
         try
         {
             main.Show(); main.UpdateLayout();
+            if (Environment.GetCommandLineArgs().Contains("--local-real-models")) { LocalModelChecks.Actual(main); main.Close(); return 0; }
+            if (Environment.GetCommandLineArgs().Contains("--local-models")) { LocalModelChecks.Run(main); main.Close(); return 0; }
             var notice = Field<Expander>("SecurityNotice");
             var host = Field<ContentControl>("WarningContentHost");
             var grid = Field<DataGrid>("FindingsGrid");
@@ -267,7 +269,7 @@ internal static class Program
             Console.WriteLine("PASS package MTL pre-render warning with approval and Unity meta references with refusal");
             ModelMaterialChecks.Run();
             MaterialResolverChecks.Run();
-            FeatureChecks.Run(main); ReferenceChecks.Run(); BindPoseChecks.Run(); UpdateUiChecks.Run(main); RepackageUiChecks.Run(main);
+            FeatureChecks.Run(main); ReferenceChecks.Run(); BindPoseChecks.Run(); UpdateUiChecks.Run(main); RepackageUiChecks.Run(main); LocalModelChecks.Run(main);
             WarningIntegrationChecks.Run(main);
             return 0;
         }

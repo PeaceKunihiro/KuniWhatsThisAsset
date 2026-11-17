@@ -32,7 +32,7 @@ public partial class MainWindow
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { PreferenceFailure(ex); }
         UpdateBookmark();
     }
-    private string? CurrentDirectory => report == null ? null : Path.GetDirectoryName(Path.GetFullPath(report.SourcePath));
+    private string? CurrentDirectory => (report?.SourcePath ?? localDocument?.SourcePath) is { } path ? Path.GetDirectoryName(Path.GetFullPath(path)) : null;
     private void UpdateBookmark()
     {
         bool saved = CurrentDirectory is { } folder && preferences.Bookmarks.Contains(folder, StringComparer.OrdinalIgnoreCase);
@@ -47,7 +47,7 @@ public partial class MainWindow
     }
     private void ChangeBookmark(bool add, string? targetDirectory = null)
     {
-        if ((targetDirectory ?? CurrentDirectory) is not { } folder) { Status.Text = "パッケージを開くと、そのフォルダーを登録できます。"; return; }
+        if ((targetDirectory ?? CurrentDirectory) is not { } folder) { Status.Text = "ファイルを開くと、そのフォルダーを登録できます。"; return; }
         try { preferences = preferenceStore.Bookmark(preferences, folder, add); UpdateBookmark(); Status.Text = add ? "ブックマークに追加しました" : "ブックマークから削除しました"; }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { PreferenceFailure(ex); }
     }
@@ -65,7 +65,7 @@ public partial class MainWindow
     {
         if (scanCancellation != null) return;
         if (!Directory.Exists(folder)) { Status.Text = "フォルダーが見つかりません: " + folder; return; }
-        var dialog = new OpenFileDialog { Filter = "Unity Package (*.unitypackage)|*.unitypackage", InitialDirectory = folder, Title = "ブックマークからパッケージを開く" };
+        var dialog = new OpenFileDialog { Filter = OpenFilter, InitialDirectory = folder, Title = "ブックマークからファイルを開く" };
         if (dialog.ShowDialog(this) == true) await LoadPackage(dialog.FileName);
     }
     private void Address_Click(object sender, MouseButtonEventArgs e)

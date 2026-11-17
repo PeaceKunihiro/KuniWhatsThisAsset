@@ -7,8 +7,10 @@ public sealed record ModelStatistics(long VertexCount, long TriangleCount, int M
 public sealed record PreviewMesh(float[] Positions, float[] Normals, int[] Indices, float[] Color, float[]? UV = null, string MaterialName = "", string NodeName = "", string TexturePath = "", string NodePath = "", string MeshName = "", bool Skinned = false);
 public sealed record ModelPreviewData(ModelStatistics Statistics, PreviewMesh[] Meshes, string[] Notes)
 {
+    public Dictionary<string, PreviewTexture> EmbeddedTextures { get; init; } = new(StringComparer.Ordinal);
     public void Validate()
     {
+        if (EmbeddedTextures == null || EmbeddedTextures.Count > 128 || EmbeddedTextures.Any(p => p.Key.Length > 4096 || p.Value == null || p.Value.Bytes == null || p.Value.Bytes.Length > 32 * 1024 * 1024 || p.Value.Width < 0 || p.Value.Height < 0 || p.Value.Width > 8192 || p.Value.Height > 8192 || (p.Value.Width == 0 ? p.Value.Height != 0 : (long)p.Value.Width * p.Value.Height * 4 != p.Value.Bytes.Length)) || EmbeddedTextures.Sum(p => (long)p.Value.Bytes.Length) > 32 * 1024 * 1024) throw new InvalidDataException("埋め込みテクスチャの容量・寸法が不正です。");
         if (Meshes == null || Statistics == null || Notes == null || Meshes.Length > 10_000 || Notes.Length > 100 || Notes.Any(n => n == null || n.Length > 4096)) throw new InvalidDataException("モデルデータの件数が不正です。");
         long vertices = 0, triangles = 0;
         foreach (var mesh in Meshes)
@@ -26,6 +28,7 @@ public sealed record ModelPreviewData(ModelStatistics Statistics, PreviewMesh[] 
             throw new InvalidDataException("モデルの統計が不正です。");
     }
 }
+public sealed record PreviewTexture(int Width, int Height, byte[] Bytes);
 
 
 

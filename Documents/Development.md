@@ -184,3 +184,15 @@ UnityPackageArchiveを読み込み・リパッケージで共有する。USTAR�
 Core全74件、WPFの入力検証・保存、GNU/PAXの.NET TarReaderによる独立読み戻しを検証。Fuzzyは134→135アセット、Luchikaは167→168アセットとなり、全ペイロードとmetaのハッシュ一致を確認した。Unity Editorでの実Importは未検証。実データと生成パッケージはignored artifacts内だけに保持し、配布には含めない。
 
 形式参考：[GNU tar format](https://www.gnu.org/software/tar/manual/html_node/Standard.html)、[POSIX pax](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/pax.html)。本機能は独自実装で、JUIコードの取り込みや新しい外部依存はない。
+
+## v0.13.0 FBX・OBJ直接読み込み
+
+LoadPackage入口で拡張子を分岐し、LocalModelDocumentが選択ファイルと明示参照のMTL/画像をスナップショットとして取得する。VirtualModelIOへの渡し方と既存の別プロセス解析を共用し、解析プロセスにローカルファイル探索を許可しない。OBJのmtllibはASCIIの仮想名へ対応付け、日本語・空白・Shift-JISを扱う。MTLのmap_KdはMTL自身の相対ディレクトリで解決する。親参照はモデル格納ルートを越えない場合だけ許可し、絶対パス・URL・reparse point参照を拒否する。
+
+ModelPreviewDataに既定値付きのEmbeddedTexturesを追加した。Assimpが取得した使用中の埋め込み画像のみを最大32 MiB/128件で転送する。圧縮データとraw BGRAの寸法・長さを検証する。既存のパッケージ表示は引き続きUnityの材質解決を使用する。新しい依存パッケージとUnity連携は追加していない。
+
+外部画像の読み込み・静的検査まで行って内容キーを計算し、キャッシュに一致すれば写真を表示する。未登録なら既存の10万三角形/材質10の確認後にだけ画像を復号しWPFメッシュを作る。キーは別名前空間kwta-local-v0.13.0-1、モデルの絶対位置と全取得ファイルのSHA256、参照診断に基づく。欠落参照の出現や消失も再読み込みに反映する。ライブ描画を再開するときは再取得する。写真容量/LRUは既存設定を共用する。
+
+単体モデルのツリーはモデル本体と取得済み参照ファイルを表示する。参照選択時には画像・テキストを表示できる。再読み込み・履歴・ブックマークはファイル入口を共用し、従来のRecentPackages保存形式を維持する。リパッケージはPackageReportがあるときだけ有効。
+
+LocalModelChecksではOBJ＋Unicode/空白/Shift-JIS MTL、MTL相対画像、外部参照拒否、テクスチャ変更・欠落によるキー更新、FBX binaryの内蔵PNG、ASCIIの外部PNG、raw BGRA・不正寸法、UIの共通入口/キャッシュ/重いモデルの描画辞退/破損時の表示を検証する。--local-modelsで単独実行できる。--local-real-modelsはユーザー提供Fuzzy/Luchikaからモデルだけをignored artifactsへ取り出し、製品の直接読み込み経路で描画する（Fuzzy32,548/Luchika121,966三角形）。有償素材・生成モデルは配布に含めない。

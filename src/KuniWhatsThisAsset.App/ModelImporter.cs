@@ -25,6 +25,7 @@ public static class ModelImporter
             throw new InvalidOperationException("モデル解析DLLをロードできません。Microsoft Visual C++ v14 x64ランタイムと配布ファイルを確認してください。 " + ex.Message, ex);
         }        using var context = new AssimpContext();
         context.SetConfig(new SharpAssimp.Configs.FBXImportAnimationsConfig(false));
+        context.SetConfig(new SharpAssimp.Configs.FBXImportEmbeddedTexturesConfig(true));
         using var io = new VirtualModelIO(input);
         context.SetIOSystem(io);
         var scene = context.ImportFile(io.MainPath, PostProcessSteps.Triangulate | PostProcessSteps.GenerateSmoothNormals | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.ValidateDataStructure);
@@ -101,6 +102,28 @@ public static class ModelImporter
         if (io.DeniedCount > 0) notes = [notes[0], $"パッケージ外または未取得の外部参照を{io.DeniedCount}件ブロックしました。"];
         if (bindIssue != null) notes = [.. notes, bindIssue];
         var data = new ModelPreviewData(new(vertices, triangles, scene.MeshCount, Math.Max(materials.Count, input.ReferencedMaterialCount), bones.Count, bones.Count > 0), result.ToArray(), notes);
+        var embedded = new Dictionary<string, PreviewTexture>(StringComparer.Ordinal);
+        long textureBytes = 0;
+        foreach (string reference in result.Select(m => m.TexturePath).Where(p => p.Length > 0).Distinct())
+        {
+            int index = reference.StartsWith('*') && int.TryParse(reference.AsSpan(1), out int number) ? number : scene.Textures.FindIndex(t => t?.Filename == reference);
+            if (index < 0 || index >= scene.Textures.Count) continue;
+            var texture = scene.Textures[index];
+            if (texture == null) continue;
+            long size = texture.IsCompressed ? texture.CompressedData?.Length ?? 0 : (long)texture.Width * texture.Height * 4;
+            if (size <= 0 || size > 32 * 1024 * 1024 || textureBytes + size > 32 * 1024 * 1024 || embedded.Count >= 128 || (!texture.IsCompressed && (texture.Width is < 1 or > 8192 || texture.Height is < 1 or > 8192)))
+            { notes = [.. notes.Take(98), "埋め込みテクスチャの容量・寸法上限を超えたため、基本色で表示します。"]; continue; }
+            byte[] pixels;
+            if (texture.IsCompressed) pixels = texture.CompressedData!;
+            else
+            {
+                pixels = new byte[(int)size]; var texels = texture.NonCompressedData;
+                if (texels == null || texels.Length * 4L != size) throw new InvalidDataException("埋め込み画像の画素数が不正です。");
+                for (int i = 0; i < texels.Length; i++) { pixels[i * 4] = texels[i].B; pixels[i * 4 + 1] = texels[i].G; pixels[i * 4 + 2] = texels[i].R; pixels[i * 4 + 3] = texels[i].A; }
+            }
+            embedded.Add(reference, new(texture.IsCompressed ? 0 : texture.Width, texture.IsCompressed ? 0 : texture.Height, pixels)); textureBytes += size;
+        }
+        data = data with { EmbeddedTextures = embedded, Notes = notes };
         data.Validate();
         return data;
     }
@@ -133,10 +156,10 @@ public sealed class VirtualModelIO : IOSystem
             string text = TextDecoder.Decode(modelBytes, false, out _);
             text = System.Text.RegularExpressions.Regex.Replace(text, @"(?m)^\s*mtllib\s+([^\r\n]+)", match =>
             {
-                string reference = match.Groups[1].Value.Trim();
+                string reference = match.Groups[1].Value.Trim().Trim('"');
                 string? whole = Resolve(baseDirectory, reference);
                 if (whole != null && aliases.TryGetValue(whole, out var alias)) return "mtllib " + alias;
-                var resolved = reference.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(r => Resolve(baseDirectory, r))
+                var resolved = LocalModelDocument.Tokens(match.Groups[1].Value).Select(r => Resolve(baseDirectory, r))
                     .Where(p => p != null && aliases.ContainsKey(p)).Select(p => aliases[p!]).ToArray();
                 return "mtllib " + (resolved.Length == 0 ? "kwta_missing.mtl" : string.Join(" ", resolved));
             }, System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
