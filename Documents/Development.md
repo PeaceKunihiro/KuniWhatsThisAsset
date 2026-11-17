@@ -196,3 +196,23 @@ ModelPreviewDataに既定値付きのEmbeddedTexturesを追加した。Assimpが
 単体モデルのツリーはモデル本体と取得済み参照ファイルを表示する。参照選択時には画像・テキストを表示できる。再読み込み・履歴・ブックマークはファイル入口を共用し、従来のRecentPackages保存形式を維持する。リパッケージはPackageReportがあるときだけ有効。
 
 LocalModelChecksではOBJ＋Unicode/空白/Shift-JIS MTL、MTL相対画像、外部参照拒否、テクスチャ変更・欠落によるキー更新、FBX binaryの内蔵PNG、ASCIIの外部PNG、raw BGRA・不正寸法、UIの共通入口/キャッシュ/重いモデルの描画辞退/破損時の表示を検証する。--local-modelsで単独実行できる。--local-real-modelsはユーザー提供Fuzzy/Luchikaからモデルだけをignored artifactsへ取り出し、製品の直接読み込み経路で描画する（Fuzzy32,548/Luchika121,966三角形）。有償素材・生成モデルは配布に含めない。
+
+## v0.13.1 プレビュー情報の表示切り替え
+
+ModelViewport左下に「〼」のToggleButtonを追加。初期状態は表示、UncheckedでinfoをCollapsedにする。モデルを消す/設定する/キャッシュ表示へ切り替える処理はトグルを初期化しないため、同一ウィンドウ内で状態を維持する。設定形式は変更しない。ボタンは非表示にならず、ツールチップとアクセシブル名を現在の操作に合わせる。情報はボタンの上に置き、情報自体のHitTestを無効にしてカメラ操作を妨げない。キャッシュ画像の余白も情報の高さと表示状態へ合わせる。CaptureViewsはモデルシーンだけを撮影するため情報やボタンはキャッシュへ入らない。
+
+既存UIテスト内でToggleの操作、ボタンの維持、モデル/キャッシュ切り替えでの保持、再表示を検証し、表示/非表示の画像をartifactsへ保存して目視確認。既存UI全体も成功。
+
+## v0.14.0 Scale・寸法の表示
+
+PreviewMeshに既定nullのMeshMeasurementを追加し、workerからローカル/合成Scale・換算後のメートル座標Bounds・元ファイル単位・換算条件を受け取る。FBXのUnitScaleFactor（cm/ファイル単位）と生成ルートの等方倍率を確認し、単位/100/ルート倍率でプレビュー座標からメートルへ換算する。画像向けのSetModel正規化やカメラ倍率は計測へ含めない。元の頂点座標・描画変換は変更しない。スキン付きモデルでは既存のバインド姿勢を適用済みの座標を計測する。
+
+行列をScale/Rotation/Translationへ分解し、再構成の誤差を検査する。シアーなどで再構成できないScaleはnull、OBJの元Scaleもnullとし、表示は不明。負倍率の分解は元の軸への符号割り当てを保証しない。メッシュ群のメートルBoundsをunionして全幅X/全高Y/全長Zを求める。
+
+ModelMeasurements.ApplyImportSettingsはModelImporterブロック内のglobalScale/useFileUnits（旧useFileScale）だけを静的に読む。単位変換OFFでは既定のファイル単位換算を除き、globalScaleを乗じる。無効な設定値は既定値と条件表示へ置換する。単体モデルでは同名.metaを格納ルート内で取得・静的検査し、既存Filesハッシュへ含める。Prefabは可視メッシュ群の計測を引き継ぎ、未対応の配置・Scale差分等をMeasurementNoteへ記録する。
+
+通常画面に全体寸法とScale概要を表示し、詳細はModelMeasurementWindowへまとめる。メッシュ別表と共通換算条件を表示する。詳細ボタンは〼で情報と一緒に隠す。キャッシュは既定nullのMeasurementを追加し、manifest上限8 MiB、件数10000等を検証する。旧manifestも読めるが、新しいpackage/localキーはv0.14.0-1として旧写真から計測値を捏造しない。設定データの形式は変更しない。
+
+Core78件、FBXメートル/センチメートル・非等方Scale・meta倍率/単位ON/OFF・OBJ仮定・シアー・キャッシュ保存/破損拒否を検証。WPFでは通常/キャッシュ概要・詳細表を確認する。Fuzzy/Luchika実データの全高は静止外形として約1.210/1.391 mだった。Unity Editorで実Importした寸法との完全一致は未検証。外部依存やUnity連携は追加しない。
+
+参考：[Unity Model Import Settings](https://docs.unity.com/en-us/engine/6000.0/manual/assets-and-media/asset-types/models/importing/fbximporter-model)、[Assimp FBXConverter](https://github.com/assimp/assimp/blob/master/code/AssetLib/FBX/FBXConverter.cpp)（単位情報と生成ルートへの倍率反映）。

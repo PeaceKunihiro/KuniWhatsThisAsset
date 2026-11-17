@@ -57,6 +57,7 @@ public partial class MainWindow
             var document = await Task.Run(() => LocalModelDocument.Read(path, cts.Token), cts.Token);
             localDocument = document; Notify(document.Findings); BuildLocalTree(document); RememberPackage(document.SourcePath);
             var model = await ModelWorker.ImportAsync(document.Input, cts.Token);
+            model = ModelMeasurements.ApplyImportSettings(model, document.MetadataText);
             await Task.Run(() => document.ReadTextures(model, cts.Token), cts.Token);
             cts.Token.ThrowIfCancellationRequested(); Notify(document.Findings); BuildLocalTree(document);
             var cache = new RenderCache(Path.Combine(preferenceStore.DirectoryPath, "RenderCache")); string key = await Task.Run(document.CacheKey, cts.Token);
@@ -81,7 +82,7 @@ public partial class MainWindow
             Status.Text = $"{item.Name} · {model.Statistics.TriangleCount:N0}ポリゴン（三角形） · Material {model.Statistics.MaterialCount:N0}";
             try
             {
-                var entry = new CachedRender(model.Statistics, ModelView.CaptureViews(), model.Notes);
+                var entry = new CachedRender(model.Statistics, ModelView.CaptureViews(), model.Notes) { Measurement = ModelMeasurements.Calculate(model) };
                 if (!await Task.Run(() => { cts.Token.ThrowIfCancellationRequested(); return cache.Write(key, entry, preferences); }, cts.Token)) AddPreviewFailure(item, "PREVIEW_CACHE", "写真一式がキャッシュ容量の上限を超えるため、保存を省略しました。");
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { if (!cts.IsCancellationRequested) AddPreviewFailure(item, "PREVIEW_CACHE", "キャッシュを保存できません: " + ex.Message); }

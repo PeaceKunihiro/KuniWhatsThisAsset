@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <DebugType>embedded</DebugType>
-    <Version>0.13.0</Version>
+    <Version>0.14.0</Version>
     <Authors>KuniWhatsThisAsset contributors</Authors>
   </PropertyGroup>
 </Project>

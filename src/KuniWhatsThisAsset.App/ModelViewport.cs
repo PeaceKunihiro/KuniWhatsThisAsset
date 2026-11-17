@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
@@ -12,7 +13,10 @@ public sealed class ModelViewport : Grid
 {
     private readonly Viewport3D viewport = new() { ClipToBounds = true, IsHitTestVisible = false };
     private readonly PerspectiveCamera camera = new() { FieldOfView = 45 };
-    private readonly TextBlock info = new() { Margin = new Thickness(10), VerticalAlignment = VerticalAlignment.Bottom, TextWrapping = TextWrapping.Wrap, Background = new SolidColorBrush(Color.FromArgb(220, 238, 223, 203)) };
+    private readonly TextBlock info = new() { Margin = new Thickness(10, 10, 10, 46), VerticalAlignment = VerticalAlignment.Bottom, TextWrapping = TextWrapping.Wrap, IsHitTestVisible = false, Background = new SolidColorBrush(Color.FromArgb(220, 238, 223, 203)) };
+    private readonly ToggleButton infoToggle = new() { Content = "〼", IsChecked = true, Width = 30, Height = 30, FontSize = 20, Padding = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(10), Background = new SolidColorBrush(Color.FromRgb(230, 198, 162)), Foreground = new SolidColorBrush(Color.FromRgb(56, 41, 30)) };
+    private readonly Button measurementDetails = new() { Content = "寸法・Scale詳細…", Height = 30, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(48,10,10,10), Padding = new Thickness(8,0,8,0), Background = new SolidColorBrush(Color.FromRgb(230,198,162)) };
+    private ModelMeasurement? measurement;
     private Point last;
     private double yaw = .5, pitch = .15, distance = 4;
     private Vector3D pan;
@@ -35,6 +39,11 @@ public sealed class ModelViewport : Grid
         }
         var open = new Button { Content = "3D表示", Padding = new Thickness(12, 3, 12, 3), Margin = new Thickness(12, 3, 3, 3) }; open.Click += (_, _) => reopen?.Invoke(); controls.Children.Add(open);
         DockPanel.SetDock(controls, Dock.Top); gallery.Children.Add(controls); gallery.Children.Add(cachedPicture); Children.Insert(1, gallery);
+        infoToggle.Checked += (_, _) => UpdateInfoVisibility(); infoToggle.Unchecked += (_, _) => UpdateInfoVisibility();
+        info.SizeChanged += (_, _) => UpdateInfoInset();
+        Children.Add(infoToggle); UpdateInfoVisibility();
+        measurementDetails.Click += (_,_) => { if(measurement!=null)new ModelMeasurementWindow(measurement){Owner=Window.GetWindow(this)}.ShowDialog(); };
+        Children.Add(measurementDetails); UpdateInfoVisibility();
         MouseDown += (_, e) => { last = e.GetPosition(this); CaptureMouse(); e.Handled = true; };
         MouseUp += (_, e) => { ReleaseMouseCapture(); e.Handled = true; };
         MouseMove += (_, e) =>
@@ -54,13 +63,24 @@ public sealed class ModelViewport : Grid
         MouseWheel += (_, e) => { distance = Math.Clamp(distance * Math.Exp(-e.Delta / 1000d), .05, 100); UpdateCamera(); e.Handled = true; };
         SizeChanged += (_, _) => UpdateCamera();
     }
-    public void ClearModel() { viewport.Children.Clear(); scene = null; info.Text = ""; cachedPicture.Source = null; pictures = []; reopen = null; gallery.Visibility = Visibility.Collapsed; viewport.Visibility = reset.Visibility = Visibility.Visible; }
+    private void UpdateInfoVisibility()
+    {
+        bool shown = infoToggle.IsChecked == true;
+        info.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+        measurementDetails.Visibility = shown && measurement != null ? Visibility.Visible : Visibility.Collapsed;
+        infoToggle.ToolTip = shown ? "プレビュー情報を隠す" : "プレビュー情報を表示";
+        System.Windows.Automation.AutomationProperties.SetName(infoToggle, infoToggle.ToolTip.ToString());
+        UpdateInfoInset();
+    }
+    private void UpdateInfoInset() => cachedPicture.Margin = new Thickness(12, 4, 12, info.Visibility == Visibility.Visible ? Math.Max(90, info.ActualHeight + 54) : 12);
+    public void ClearModel() { viewport.Children.Clear(); scene = null; measurement=null; measurementDetails.Visibility=Visibility.Collapsed; info.Text = ""; cachedPicture.Source = null; pictures = []; reopen = null; gallery.Visibility = Visibility.Collapsed; viewport.Visibility = reset.Visibility = Visibility.Visible; }
     public void ShowCached(CachedRender cached, Action renderAgain)
     {
         ClearModel();
         pictures = cached.Pictures.Select(p => ImagePreviewDecoder.Decode(p, "cache.png")).ToArray(); cachedPicture.Source = pictures[0]; reopen = renderAgain;
         viewport.Visibility = reset.Visibility = Visibility.Collapsed; gallery.Visibility = Visibility.Visible;
         info.Text = $"レンダリングキャッシュ · {cached.Statistics.TriangleCount:N0}ポリゴン（三角形）\n正面 / 側面 / 平面の透過写真。「3D表示」で再解析・描画します。";
+        measurement=cached.Measurement;AppendMeasurement();
     }
     public byte[][] CaptureViews()
     {
@@ -107,7 +127,13 @@ public sealed class ModelViewport : Grid
         content.Freeze(); scene = content; viewport.Children.Add(new ModelVisual3D { Content = content });
         var s = model.Statistics;
         info.Text = $"頂点 {s.VertexCount:N0} / ポリゴン（三角形） {s.TriangleCount:N0}\nMesh {s.MeshCount:N0} / 依存Material {s.MaterialCount:N0} / Bone {s.BoneCount:N0} / Skin {(s.HasSkinning ? "あり" : "なし")}\n左ドラッグ: 回転 · 右/中ドラッグ: 移動 · ホイール: ズーム";
+        measurement=ModelMeasurements.Calculate(model);AppendMeasurement();
         Reset();
+    }
+    private void AppendMeasurement()
+    {
+        info.Text += measurement==null?"\n推測寸法・Scale：未取得（3D表示で再解析）":"\n推測寸法："+ModelMeasurements.Size(measurement.Bounds)+"\nScale（ローカル）："+ModelMeasurements.ScaleSummary(measurement);
+        UpdateInfoVisibility();
     }
     private void Reset() { yaw = 0; pitch = 0; pan = new(); distance = 3.1; UpdateCamera(); }
     private void UpdateCamera()

@@ -26,13 +26,13 @@ internal static class WarningIntegrationChecks
         var model = new ModelPreviewData(new(3, 1, 1, 1, 0, false), [new([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2], [1, 1, 1, 1])], notes);
         var view = Field<ModelViewport>("ModelView"); view.SetModel(model);
         var info = (TextBlock)typeof(ModelViewport).GetField("info", flags)!.GetValue(view)!;
-        Check(!info.Text.Contains("材質") && info.Text.Split('\n').Length == 3, "Diagnostics filled live preview");
+        Check(!info.Text.Contains("材質") && info.Text.Split('\n').Length <= 5 && info.Text.Contains("推測寸法"), "Diagnostics filled live preview");
         var photos = view.CaptureViews();
         var store = Field<PreferenceStore>("preferenceStore"); var cache = new RenderCache(Path.Combine(store.DirectoryPath, "RenderCache"));
         string key = RenderCache.KeyAsync(report.SourcePath, item.Guid, CancellationToken.None).GetAwaiter().GetResult();
         cache.Write(key, new(model.Statistics, photos, notes), new());
         Call("StopModelPreview"); FeatureChecks.Pump((Task)Call("ShowModelAsync", item, report, new ScanLimits(), null)!);
-        Check(!info.Text.Contains("材質") && info.Text.Split('\n').Length == 2, "Old cache notes filled preview");
+        Check(!info.Text.Contains("材質") && info.Text.Split('\n').Length <= 4 && info.Text.Contains("推測寸法"), "Old cache notes filled preview");
         Check(grid.Items.Cast<Finding>().Contains(baseline) && grid.Items.Count == 83, "Warning merge or legacy duplicate suppression failed");
         Check(grid.Items.Cast<Finding>().First() == baseline, "Preview warnings displaced a high-severity security finding");
         Check(!notice.IsExpanded && notice.Visibility == Visibility.Visible, "Diagnostics did not remain passive");

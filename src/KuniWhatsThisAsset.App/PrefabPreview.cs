@@ -67,6 +67,7 @@ public static class PrefabPreviewBuilder
             if (!modelBytes.Remove(guid, out var bytes)) throw new InvalidDataException("依存モデルが見つかりません。");
             var data = await ModelWorker.ImportAsync(new(source.Path, bytes, new()), token);
             string meta = TextDecoder.Decode(modelMeta.GetValueOrDefault(guid) ?? [], false, out _);
+            data = ModelMeasurements.ApplyImportSettings(data, meta);
             var resolution = await Task.Run(() => resolver.Resolve(source, meta, data, allowPrefabInference: false), token);
             return models[guid] = (data, meta, resolution);
         }
@@ -221,7 +222,7 @@ public static class PrefabPreviewBuilder
         if (meshes.Count == 0) throw new InvalidDataException("表示可能なモデル参照がありません（非表示・参照不足・未対応の内蔵Mesh等）。");
         notes.Add("Prefab静止近似：材質・表示状態の差分を反映。配置変更・Bone姿勢・BlendShape・Scriptは未反映。");
         var stats = new ModelStatistics(vertices, triangles, meshes.Count, meshes.Select(m => m.MaterialName).Distinct().Count(), models.Values.Sum(m => m.Data.Statistics.BoneCount), models.Values.Any(m => m.Data.Statistics.HasSkinning));
-        var data = new ModelPreviewData(stats, meshes.ToArray(), notes.Take(32).ToArray()); data.Validate();
+        var data = new ModelPreviewData(stats, meshes.ToArray(), notes.Take(32).ToArray()) { MeasurementNote = "Prefab静止近似の外形。Prefabの配置・Scale差分、Bone姿勢、BlendShapeは未反映。" }; data.Validate();
         var metadata = new StringBuilder("ModelImporter:\n  externalObjects:\n");
         foreach (var (name, guid) in bindings) metadata.Append($"  - first:\n      name: {name}\n    second: {{fileID: 2100000, guid: {guid}, type: 2}}\n");
         return new(data, metadata.ToString());

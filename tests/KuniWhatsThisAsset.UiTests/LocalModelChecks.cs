@@ -73,11 +73,12 @@ internal static class LocalModelChecks
         foreach (var (name, package) in new[] { ("Fuzzy", "E:/GPT_WORKS/KWT_TEST/Fuzzy_ver.2.00/Fuzzy.unitypackage"), ("Luchika", "E:/GPT_WORKS/KWT_TEST/Luchika_ver.1.00/Luchika.unitypackage") })
         {
             var reader=new PackageReader();var report=reader.Read(package);var item=report.Items.Where(i=>i.Format==".fbx").MaxBy(i=>i.Size)!;
-            string directory=Path.GetFullPath("artifacts/local-real-models/"+name);Directory.CreateDirectory(directory);string path=Path.Combine(directory,item.Name);File.WriteAllBytes(path,reader.ReadAssetBytes(package,item.Guid));
+            string directory=Path.GetFullPath("artifacts/local-real-models/"+name);Directory.CreateDirectory(directory);string path=Path.Combine(directory,item.Name);File.WriteAllBytes(path,reader.ReadAssetBytes(package,item.Guid));File.WriteAllBytes(path+".meta",reader.ReadAssetMetaBytes(package,item.Guid));
             var task=(Task)typeof(MainWindow).GetMethod("LoadLocalModelAsync",Flags)!.Invoke(main,[path,(Func<ModelStatistics,bool>)(_=>true),false])!;FeatureChecks.Pump(task,100);
             var status=(TextBlock)typeof(MainWindow).GetField("Status",Flags)!.GetValue(main)!;var viewport=(ModelViewport)typeof(MainWindow).GetField("ModelView",Flags)!.GetValue(main)!;
             if(viewport.Visibility!=Visibility.Visible||!status.Text.Contains("ポリゴン"))throw new Exception("Real direct model failed: "+name+" "+status.Text);
-            Console.WriteLine("PASS real direct model "+name+": "+status.Text);
+            var metrics=(ModelMeasurement)typeof(ModelViewport).GetField("measurement",Flags)!.GetValue(viewport)!;metrics.Validate();
+            Console.WriteLine("PASS real direct model "+name+": "+status.Text+" / "+ModelMeasurements.Size(metrics.Bounds));
         }
     }
 }

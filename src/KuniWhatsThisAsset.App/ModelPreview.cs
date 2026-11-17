@@ -88,6 +88,7 @@ public partial class MainWindow
                 return new ModelInput(item.Path, bytes, dependencies, referencedMaterialCount);
             }, cts.Token);
             model = await ModelWorker.ImportAsync(input, cts.Token);
+            model = ModelMeasurements.ApplyImportSettings(model, metadataText);
             }
             cts.Token.ThrowIfCancellationRequested();
             var stats = model.Statistics;
@@ -107,7 +108,7 @@ public partial class MainWindow
             try
             {
                 var pictures = ModelView.CaptureViews();
-                var entry = new CachedRender(stats, pictures, model.Notes);
+                var entry = new CachedRender(stats, pictures, model.Notes) { Measurement = ModelMeasurements.Calculate(model) };
                 bool saved = await Task.Run(() => { cts.Token.ThrowIfCancellationRequested(); return cache.Write(cacheKey, entry, preferences); }, cts.Token);
                 if (!cts.IsCancellationRequested && !saved) AddPreviewFailure(item, "PREVIEW_CACHE", "写真一式がキャッシュ容量の上限を超えるため、保存を省略しました。");
             }

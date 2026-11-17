@@ -14,6 +14,7 @@ public sealed class LocalModelDocument
 {
     public string SourcePath { get; }
     public ModelInput Input { get; private set; } = null!;
+    public string MetadataText { get; private set; } = "";
     public Dictionary<string, byte[]> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<Finding> Findings { get; } = [];
     public List<string> Notes { get; } = [];
@@ -64,6 +65,12 @@ public sealed class LocalModelDocument
             bytes = Encoding.UTF8.GetBytes(text);
         }
         document.Input = new("model" + ext, bytes, dependencies);
+        string metaName = Path.GetFileName(path) + ".meta";
+        if(document.Exists(metaName))
+        {
+            try { document.MetadataText = TextDecoder.Decode(document.ReadFile(metaName, 4 * 1024 * 1024, token), false, out _); }
+            catch(Exception ex)when(FileFailure(ex)){document.Notes.Add("モデルのmetaを取得できないため、読み込み倍率は既定値で推測します: "+ex.Message);}
+        }
         return document;
     }
     private static MatchCollection Matches(string text, string pattern) => Regex.Matches(text, pattern, RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
@@ -150,7 +157,7 @@ public sealed class LocalModelDocument
     public string CacheKey()
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        hash.AppendData(Encoding.UTF8.GetBytes("kwta-local-v0.13.0-1:" + SourcePath));
+        hash.AppendData(Encoding.UTF8.GetBytes("kwta-local-v0.14.0-1:" + SourcePath));
         foreach (var (path, bytes) in Files.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase))
         { hash.AppendData(Encoding.UTF8.GetBytes(path + "\0")); hash.AppendData(SHA256.HashData(bytes)); }
         foreach (string note in Notes.Distinct().Order(StringComparer.Ordinal)) hash.AppendData(Encoding.UTF8.GetBytes(note + "\0"));

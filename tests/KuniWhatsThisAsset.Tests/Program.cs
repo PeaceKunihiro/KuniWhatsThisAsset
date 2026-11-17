@@ -342,6 +342,7 @@ Test("Prefab parser rejects binary and resolves inactive ancestors", () =>
 SelfUpdateChecks.Run(output, Test, Check);
 RepackageChecks.Run(output, Test, Check);
 TarExtensionChecks.Run(output, Test, Check);
+MeasurementChecks.Run(output, Test, Check);
 Console.WriteLine($"\n{passed} passed, {failed} failed. Fixtures: {output}");
 return failed == 0 ? 0 : 1;
 

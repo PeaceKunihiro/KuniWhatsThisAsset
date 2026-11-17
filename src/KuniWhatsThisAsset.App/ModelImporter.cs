@@ -30,6 +30,8 @@ public static class ModelImporter
         context.SetIOSystem(io);
         var scene = context.ImportFile(io.MainPath, PostProcessSteps.Triangulate | PostProcessSteps.GenerateSmoothNormals | PostProcessSteps.JoinIdenticalVertices | PostProcessSteps.ValidateDataStructure);
         if (scene == null || scene.RootNode == null || !scene.HasMeshes) throw new InvalidDataException("表示できるメッシュがありません。");
+        bool fbx = Path.GetExtension(input.Path).Equals(".fbx", StringComparison.OrdinalIgnoreCase);
+        var units = ModelMeasurementReader.ReadUnits(scene, fbx);
         var bindPoses = new Dictionary<string, Matrix4x4>(); string? bindIssue = null;
         if (Path.GetExtension(input.Path).Equals(".fbx", StringComparison.OrdinalIgnoreCase))
         {
@@ -93,7 +95,8 @@ public static class ModelImporter
                 var diffuse = material.HasColorDiffuse ? material.ColorDiffuse : new Vector4(.72f, .64f, .53f, 1f);
                 var uv = new float[mesh.VertexCount * 2];
                 if (mesh.HasTextureCoords(0)) for (int i = 0; i < mesh.VertexCount; i++) { uv[i * 2] = mesh.TextureCoordinateChannels[0][i].X; uv[i * 2 + 1] = 1 - mesh.TextureCoordinateChannels[0][i].Y; }
-                result.Add(new(positions, normals, indices, [Math.Clamp(diffuse.X, 0, 1), Math.Clamp(diffuse.Y, 0, 1), Math.Clamp(diffuse.Z, 0, 1), 1], uv, material.Name ?? "", next.Node.Name ?? "", material.HasTextureDiffuse ? material.TextureDiffuse.FilePath : "", next.Path, mesh.Name ?? "", mesh.BoneCount > 0));
+                result.Add(new(positions, normals, indices, [Math.Clamp(diffuse.X, 0, 1), Math.Clamp(diffuse.Y, 0, 1), Math.Clamp(diffuse.Z, 0, 1), 1], uv, material.Name ?? "", next.Node.Name ?? "", material.HasTextureDiffuse ? material.TextureDiffuse.FilePath : "", next.Path, mesh.Name ?? "", mesh.BoneCount > 0)
+                { Measurement = new(mesh.Name ?? next.Node.Name ?? "",next.Path,fbx?ModelMeasurementReader.Scale(Matrix4x4.Transpose(next.Node.Transform)):null,fbx?ModelMeasurementReader.Scale(meshTransform):null,ModelBounds.From(positions,units.Factor),units.FileMeters,units.Basis) });
                 foreach (var bone in mesh.Bones) bones.Add(bone.Name);
             }
             foreach (var child in next.Node.Children) pending.Push((child, transform, next.Depth + 1, next.Path.Length == 0 ? child.Name : next.Path + "/" + child.Name));

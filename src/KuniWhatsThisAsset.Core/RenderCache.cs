@@ -4,18 +4,21 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace KuniWhatsThisAsset.Core;
-public sealed record CachedRender(ModelStatistics Statistics, byte[][] Pictures, string[] Notes);
+public sealed record CachedRender(ModelStatistics Statistics, byte[][] Pictures, string[] Notes)
+{
+    public ModelMeasurement? Measurement { get; init; }
+}
 public sealed class RenderCache(string directory)
 {
     public string DirectoryPath { get; } = Path.GetFullPath(directory);
     public static readonly string[] Views = ["front", "side", "top"];
-    private sealed record Manifest(ModelStatistics Statistics, string[] Hashes, string[] Notes);
+    private sealed record Manifest(ModelStatistics Statistics, string[] Hashes, string[] Notes, ModelMeasurement? Measurement = null);
     private static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
     public static async Task<string> KeyAsync(string packagePath, string assetGuid, CancellationToken token)
     {
         await using var stream = File.OpenRead(packagePath);
         var digest = await SHA256.HashDataAsync(stream, token).ConfigureAwait(false);
-        return Hash(Encoding.UTF8.GetBytes("kwta-render-v0.10.1-1:" + Convert.ToHexString(digest) + ":" + assetGuid));
+        return Hash(Encoding.UTF8.GetBytes("kwta-render-v0.14.0-1:" + Convert.ToHexString(digest) + ":" + assetGuid));
     }
     private string PathFor(string key, string suffix)
     {
@@ -36,7 +39,7 @@ public sealed class RenderCache(string directory)
         if (!File.Exists(path)) return null;
         try
         {
-            if (new FileInfo(path).Length > 64 * 1024) return null;
+            if (new FileInfo(path).Length > 8 * 1024 * 1024) return null;
             var manifest = JsonSerializer.Deserialize<Manifest>(File.ReadAllText(path));
             if (manifest == null || manifest.Statistics == null || manifest.Hashes == null || manifest.Hashes.Length != 3 || manifest.Notes == null || manifest.Notes.Length > 100 || manifest.Notes.Any(n => n == null || n.Length > 4096)) return null;
             var stats = manifest.Statistics;
@@ -46,14 +49,17 @@ public sealed class RenderCache(string directory)
                 if (new FileInfo(p).Length > 8 * 1024 * 1024) throw new InvalidDataException("Cache photo too large"); return File.ReadAllBytes(p);
             }).ToArray();
             if (pictures.Where((p, i) => Hash(p) != manifest.Hashes[i]).Any()) return null;
-            File.SetLastWriteTimeUtc(path, DateTime.UtcNow); return new CachedRender(manifest.Statistics, pictures, manifest.Notes);
+            manifest.Measurement?.Validate();
+            File.SetLastWriteTimeUtc(path, DateTime.UtcNow); return new CachedRender(manifest.Statistics, pictures, manifest.Notes) { Measurement = manifest.Measurement };
         }
-        catch (Exception ex) when (ex is IOException or JsonException or ArgumentException or NullReferenceException) { return null; }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or JsonException or ArgumentException or NullReferenceException) { return null; }
     });
     public bool Write(string key, CachedRender entry, UserPreferences settings) => Locked(() =>
     {
         if (entry.Pictures.Length != 3 || entry.Pictures.Any(p => p.Length > 8 * 1024 * 1024)) throw new InvalidDataException("キャッシュ写真が不正です。");
-        byte[] metadata = JsonSerializer.SerializeToUtf8Bytes(new Manifest(entry.Statistics, entry.Pictures.Select(Hash).ToArray(), entry.Notes));
+        entry.Measurement?.Validate();
+        byte[] metadata = JsonSerializer.SerializeToUtf8Bytes(new Manifest(entry.Statistics, entry.Pictures.Select(Hash).ToArray(), entry.Notes, entry.Measurement));
+        if (metadata.Length > 8 * 1024 * 1024) return false;
         long size = metadata.Length + entry.Pictures.Sum(p => (long)p.Length);
         long limit = settings.CacheUnlimited ? long.MaxValue : checked(settings.CacheLimitMiB * 1024 * 1024);
         if (size > limit) return false;

@@ -27,6 +27,7 @@ internal static class Program
         try
         {
             main.Show(); main.UpdateLayout();
+            if (Environment.GetCommandLineArgs().Contains("--measurements")) { MeasurementChecks.Run(main); main.Close(); return 0; }
             if (Environment.GetCommandLineArgs().Contains("--local-real-models")) { LocalModelChecks.Actual(main); main.Close(); return 0; }
             if (Environment.GetCommandLineArgs().Contains("--local-models")) { LocalModelChecks.Run(main); main.Close(); return 0; }
             var notice = Field<Expander>("SecurityNotice");
@@ -154,6 +155,27 @@ internal static class Program
             var modelView = new ModelViewport { Width = 400, Height = 350 };
             modelView.SetModel(imported);
             Check(imported.Meshes[0].Positions.Max() == 1, "OBJ positions wrong");
+            var infoToggle = (System.Windows.Controls.Primitives.ToggleButton)typeof(ModelViewport).GetField("infoToggle", flags)!.GetValue(modelView)!;
+            var modelInfo = (TextBlock)typeof(ModelViewport).GetField("info", flags)!.GetValue(modelView)!;
+            var togglePeer = new System.Windows.Automation.Peers.ToggleButtonAutomationPeer(infoToggle);
+            var toggleProvider = (System.Windows.Automation.Provider.IToggleProvider)togglePeer.GetPattern(System.Windows.Automation.Peers.PatternInterface.Toggle)!;
+            Check(modelInfo.Visibility == Visibility.Visible && infoToggle.Content.ToString() == "〼", "Info toggle missing/default hidden");
+            toggleProvider.Toggle(); Check(modelInfo.Visibility == Visibility.Collapsed && infoToggle.Visibility == Visibility.Visible, "Hide must retain toggle");
+            modelView.SetModel(imported); Check(modelInfo.Visibility == Visibility.Collapsed, "Model reload reset hidden information");
+            var togglePictures = modelView.CaptureViews();
+            modelView.ShowCached(new(imported.Statistics, togglePictures, imported.Notes), () => { });
+            Check(modelInfo.Visibility == Visibility.Collapsed && infoToggle.Visibility == Visibility.Visible, "Cache reset hidden information");
+            toggleProvider.Toggle(); Check(modelInfo.Visibility == Visibility.Visible, "Cached information could not be shown");
+            modelView.SetModel(imported);
+            var toggleWindow = new Window { Content = modelView, SizeToContent = SizeToContent.WidthAndHeight, Owner = main }; toggleWindow.Show(); toggleWindow.UpdateLayout();
+            void CaptureInfo(string suffix)
+            {
+                modelView.UpdateLayout(); var screenshot = new System.Windows.Media.Imaging.RenderTargetBitmap(400,350,96,96,System.Windows.Media.PixelFormats.Pbgra32); screenshot.Render(modelView);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(screenshot));
+                using var file = System.IO.File.Create("artifacts/preview-info-"+suffix+"-v0.13.1.png"); encoder.Save(file);
+            }
+            CaptureInfo("shown"); toggleProvider.Toggle(); CaptureInfo("hidden"); toggleWindow.Close();
+            Console.WriteLine("PASS preview info icon hide/show, retained button, model/cache transitions and accessible toggle");
             var workerModel = ModelWorker.ImportAsync(modelInput, CancellationToken.None).GetAwaiter().GetResult();
             Check(workerModel.Statistics.TriangleCount == 1, "Child process import failed");
             Console.WriteLine("PASS native OBJ import, WPF geometry and isolated worker roundtrip");
@@ -269,7 +291,7 @@ internal static class Program
             Console.WriteLine("PASS package MTL pre-render warning with approval and Unity meta references with refusal");
             ModelMaterialChecks.Run();
             MaterialResolverChecks.Run();
-            FeatureChecks.Run(main); ReferenceChecks.Run(); BindPoseChecks.Run(); UpdateUiChecks.Run(main); RepackageUiChecks.Run(main); LocalModelChecks.Run(main);
+            FeatureChecks.Run(main); ReferenceChecks.Run(); BindPoseChecks.Run(); UpdateUiChecks.Run(main); RepackageUiChecks.Run(main); LocalModelChecks.Run(main); MeasurementChecks.Run(main);
             WarningIntegrationChecks.Run(main);
             return 0;
         }
