@@ -13,8 +13,8 @@ internal static class PublishedUpdateChecks
         {
             string work=Path.GetFullPath("artifacts/published-update-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(work);
             string staged=Path.Combine(work,"package"),target=Path.Combine(work,"installed");
-            var version=new Version(0,11,0);
-            UpdateDistribution.Extract(Path.GetFullPath("Stable/KuniWhatsThisAsset-v0.11.0-win-x64.zip"),staged,version,CancellationToken.None);
+            var assemblyVersion=typeof(MainWindow).Assembly.GetName().Version!;var version=new Version(assemblyVersion.Major,assemblyVersion.Minor,assemblyVersion.Build);
+            UpdateDistribution.Extract(Path.GetFullPath($"Stable/KuniWhatsThisAsset-v{version.ToString(3)}-win-x64.zip"),staged,version,CancellationToken.None);
             string old=Path.GetFullPath("artifacts/KuniWhatsThisAsset-v0.10.1-win-x64");
             foreach(string file in Directory.EnumerateFiles(old,"*",SearchOption.AllDirectories)) {string output=Path.Combine(target,Path.GetRelativePath(old,file));Directory.CreateDirectory(Path.GetDirectoryName(output)!);File.Copy(file,output);}
             File.WriteAllText(Path.Combine(target,"preferences.json"),"preserve-user-settings");Directory.CreateDirectory(Path.Combine(target,"RenderCache"));File.WriteAllText(Path.Combine(target,"RenderCache","test.txt"),"preserve-cache");
@@ -36,11 +36,11 @@ internal static class PublishedUpdateChecks
             if(!helper.WaitForExit(30000)||helper.ExitCode!=0)throw new Exception("Update helper failed: "+error.GetAwaiter().GetResult());
             UpdateDistribution.Verify(target,version);
             using var result=JsonDocument.Parse(File.ReadAllBytes(Path.Combine(work,"result.json")));int pid=result.RootElement.GetProperty("ProcessId").GetInt32();restarted=Process.GetProcessById(pid);
-            var clock=Stopwatch.StartNew();while(clock.Elapsed<TimeSpan.FromSeconds(20)){restarted.Refresh();if(restarted.HasExited)throw new Exception("Restarted app exited early");if(restarted.MainWindowHandle!=IntPtr.Zero && restarted.MainWindowTitle.Contains("v0.11.0"))break;Thread.Sleep(100);}
-            if(restarted.MainWindowHandle==IntPtr.Zero||!restarted.MainWindowTitle.Contains("v0.11.0"))throw new Exception("New application window did not initialize: "+restarted.MainWindowTitle);
+            var clock=Stopwatch.StartNew();while(clock.Elapsed<TimeSpan.FromSeconds(20)){restarted.Refresh();if(restarted.HasExited)throw new Exception("Restarted app exited early");if(restarted.MainWindowHandle!=IntPtr.Zero && restarted.MainWindowTitle.Contains("v"+version.ToString(3)))break;Thread.Sleep(100);}
+            if(restarted.MainWindowHandle==IntPtr.Zero||!restarted.MainWindowTitle.Contains("v"+version.ToString(3)))throw new Exception("New application window did not initialize: "+restarted.MainWindowTitle);
             if(File.ReadAllText(Path.Combine(target,"preferences.json"))!="preserve-user-settings"||File.ReadAllText(Path.Combine(target,"RenderCache/test.txt"))!="preserve-cache")throw new Exception("User settings/cache changed");
             restarted.CloseMainWindow();if(!restarted.WaitForExit(10000))throw new Exception("Updated window did not close");
-            Console.WriteLine("PASS published single-file helper: waits for v0.10.1, replaces with v0.11.0, restarts WPF window, preserves settings/cache and old unowned files");
+            Console.WriteLine($"PASS published single-file helper: waits for v0.10.1, replaces with v{version.ToString(3)}, restarts WPF window, preserves settings/cache and old unowned files");
             return 0;
         }
         catch(Exception ex){Console.Error.WriteLine(ex);return 1;}

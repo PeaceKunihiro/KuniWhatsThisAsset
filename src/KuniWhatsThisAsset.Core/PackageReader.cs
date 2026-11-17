@@ -1,8 +1,5 @@
-using System.Formats.Tar;
-using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Buffers.Binary;
 
 namespace KuniWhatsThisAsset.Core;
 
@@ -66,42 +63,27 @@ public sealed class PackageReader
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         if (!limits.IgnoreReadLimits) deadline.CancelAfter(limits.Timeout);
         var token = deadline.Token;
-        using var input = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (!limits.IgnoreReadLimits && input.Length > limits.MaxPackageBytes) throw new ReadLimitExceededException(ReadLimitKind.PackageBytes, "パッケージの容量上限を超えています。");
-        if (input.Length < 18) throw new InvalidDataException("GZipファイルが短すぎます。");
-        Span<byte> footer = stackalloc byte[8];
-        input.Seek(-8, SeekOrigin.End);
-        input.ReadExactly(footer);
-        uint expectedCrc = BinaryPrimitives.ReadUInt32LittleEndian(footer);
-        uint expectedSize = BinaryPrimitives.ReadUInt32LittleEndian(footer[4..]);
-        input.Position = 0;
-        using var gzip = new GZipStream(input, CompressionMode.Decompress);
-        using var bounded = new BudgetStream(gzip, limits, token);
-        using var tar = new TarReader(bounded, leaveOpen: true);
+        using var archive = new UnityPackageArchive(file, limits, token);
         var assets = new Dictionary<string, Asset>(StringComparer.OrdinalIgnoreCase);
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var findings = new List<Finding>();
         int count = 0, sampleBudget = limits.MaxTotalTextBytes;
-        TarEntry? entry;
-        long endHeaderOffset;
+        long pathBytesTotal = 0;
+        ArchiveMember? entry;
         while (true)
         {
-            // The reader may still need to consume padding from the previous member.
-            endHeaderOffset = (bounded.BytesRead + 511) / 512 * 512;
-            entry = tar.GetNextEntry(copyData: false);
+            entry = archive.Next();
             if (entry == null) break;
             token.ThrowIfCancellationRequested();
             if (++count > limits.MaxEntries && !limits.IgnoreReadLimits) throw new ReadLimitExceededException(ReadLimitKind.Entries, "アーカイブ内の項目数が上限を超えています。");
             string name = entry.Name.TrimEnd('/');
             ValidatePath(name);
             if (!names.Add(name)) throw new InvalidDataException($"アーカイブ内に重複した項目があります: {name}");
-            if (entry.EntryType is TarEntryType.Directory)
+            if (entry.Directory)
             {
                 if (!Regex.IsMatch(name, @"\A[0-9a-fA-F]{32}\z")) throw new InvalidDataException("不正なパッケージディレクトリです。");
                 continue;
             }
-            if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile))
-                throw new InvalidDataException($"リンク・特殊ファイルは読み込めません: {name}");
             if (entry.Length < 0 || (!limits.IgnoreReadLimits && entry.Length > limits.MaxMemberBytes)) throw new ReadLimitExceededException(ReadLimitKind.MemberBytes, $"ファイルの容量上限を超えています: {name}");
             string[] parts = name.Split('/');
             if (parts.Length != 2 || !Regex.IsMatch(parts[0], @"\A[0-9a-fA-F]{32}\z"))
@@ -114,8 +96,10 @@ public sealed class PackageReader
             switch (parts[1])
             {
                 case "pathname":
-                    if (entry.Length > 4096) throw new InvalidDataException("pathnameが長すぎます。");
-                    byte[] pathBytes = ReadSample(entry, 4096, token);
+                    if (entry.Length > 131072) throw new InvalidDataException("pathnameが長すぎます。");
+                    pathBytesTotal += entry.Length;
+                    if (!limits.IgnoreReadLimits && pathBytesTotal > limits.MaxPathBytes) throw new ReadLimitExceededException(ReadLimitKind.PathBytes, "パッケージ内パス情報の総容量上限（初期64 MiB）を超えています。");
+                    byte[] pathBytes = ReadSample(entry, 131072, token);
                     string path;
                     try { path = new UTF8Encoding(false, true).GetString(pathBytes).TrimEnd('\r', '\n'); }
                     catch (DecoderFallbackException ex) { throw new InvalidDataException("pathnameがUTF-8ではありません。", ex); }
@@ -143,16 +127,6 @@ public sealed class PackageReader
             }
             if (count == 1 || count % 100 == 0) progress?.Report(count);
         }
-        // Consume the trailer as well: enforce the decompression limit and validate GZip integrity.
-        var buffer = new byte[64 * 1024];
-        int read;
-        while ((read = bounded.Read(buffer, 0, buffer.Length)) > 0)
-            if (buffer.AsSpan(0, read).IndexOfAnyExcept((byte)0) >= 0)
-                throw new InvalidDataException("TAR終端の後に不明なデータがあります。");
-        if (bounded.Crc32 != expectedCrc || (uint)bounded.BytesRead != expectedSize)
-            throw new InvalidDataException("GZipのCRCまたは展開サイズが一致しません。破損・切り詰め・複数ストリームの可能性があります。");
-        if (bounded.BytesRead % 512 != 0 || bounded.TrailingZeros < 1024 || bounded.BytesRead - endHeaderOffset < 1024)
-            throw new InvalidDataException("TAR終端のゼロブロックが不足しています。");
         if (assets.Count == 0) throw new InvalidDataException("UnityPackageのアセットが見つかりません。");
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var items = new List<PackageItem>();
@@ -180,12 +154,12 @@ public sealed class PackageReader
             items.Add(new(guid, asset.Path, asset.Size ?? 0, asset.Size == null, itemFindings, text));
             findings.AddRange(itemFindings);
         }
-        return new(System.IO.Path.GetFullPath(file), items.OrderBy(i => i.Path, StringComparer.OrdinalIgnoreCase).ToArray(), findings, bounded.BytesRead);
+        return new(System.IO.Path.GetFullPath(file), items.OrderBy(i => i.Path, StringComparer.OrdinalIgnoreCase).ToArray(), findings, archive.BytesRead);
     }
 
     public static void ValidatePath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path) || path.Length > 2048 || path.Contains('\\') || path.StartsWith('/') || path.Any(c => char.IsControl(c) || "<>:\"|?*".Contains(c)))
+        if (string.IsNullOrWhiteSpace(path) || path.Length > 32700 || path.Contains('\\') || path.StartsWith('/') || path.Any(c => char.IsControl(c) || "<>:\"|?*".Contains(c)))
             throw new InvalidDataException("絶対パス・制御文字・Windowsで不正な文字を含むパスです。");
         foreach (string part in path.Split('/'))
         {
@@ -196,7 +170,7 @@ public sealed class PackageReader
         }
     }
 
-    private static byte[] ReadSample(TarEntry entry, int capacity, CancellationToken token, AssetCapture? capture = null)
+    private static byte[] ReadSample(ArchiveMember entry, int capacity, CancellationToken token, AssetCapture? capture = null)
     {
         if (capture != null && entry.Length > capture.MaxBytes) throw new InvalidDataException($"プレビュー用アセットの入力上限（{capture.MaxBytes / 1024 / 1024} MiB）を超えています。");
         if (capture?.Budget != null) { if (entry.Length > capture.Budget.Remaining) throw new InvalidDataException("関連アセットの総容量上限を超えています。"); capture.Budget.Remaining -= entry.Length; }
@@ -221,102 +195,4 @@ public sealed class PackageReader
         return memory.ToArray();
     }
 
-    private sealed class BudgetStream(Stream inner, ScanLimits limits, CancellationToken token) : Stream
-    {
-        public long BytesRead { get; private set; }
-        public long TrailingZeros { get; private set; }
-        private uint crc = 0xffffffff;
-        public uint Crc32 => ~crc;
-        private static readonly uint[] CrcTable = BuildCrcTable();
-        private readonly byte[] header = new byte[512];
-        private int headerBytes, physicalEntries, endBlocks;
-        private long dataRemaining;
-
-        // Guard physical TAR headers before TarReader interprets extension records.
-        // Unity's short GUID/member names do not require PAX/GNU extension payloads.
-        private void GuardHeaders(ReadOnlySpan<byte> bytes)
-        {
-            while (!bytes.IsEmpty)
-            {
-                if (dataRemaining > 0)
-                {
-                    int skip = (int)Math.Min(dataRemaining, bytes.Length);
-                    dataRemaining -= skip; bytes = bytes[skip..]; continue;
-                }
-                int take = Math.Min(512 - headerBytes, bytes.Length);
-                bytes[..take].CopyTo(header.AsSpan(headerBytes));
-                headerBytes += take; bytes = bytes[take..];
-                if (headerBytes != 512) continue;
-                headerBytes = 0;
-                if (header.AsSpan().IndexOfAnyExcept((byte)0) < 0) { endBlocks++; continue; }
-                if (endBlocks > 0) throw new InvalidDataException("TAR終端の後に別の項目があります。");
-                if (++physicalEntries > limits.MaxEntries && !limits.IgnoreReadLimits) throw new ReadLimitExceededException(ReadLimitKind.Entries, "アーカイブ項目数の上限を超えています。");
-                if (header[156] is not (0 or (byte)'0' or (byte)'5'))
-                    throw new InvalidDataException("TARのリンク・特殊ファイル・PAX/GNU拡張レコードは読み込めません。");
-                long size = Octal(header.AsSpan(124, 12));
-                if (!limits.IgnoreReadLimits && size > limits.MaxMemberBytes) throw new ReadLimitExceededException(ReadLimitKind.MemberBytes, "TARメンバーの容量上限を超えています。");
-                if (header[156] == '5' && size != 0) throw new InvalidDataException("ディレクトリのサイズが不正です。");
-                long checksum = 0;
-                for (int i = 0; i < 512; i++) checksum += i is >= 148 and < 156 ? 32 : header[i];
-                if (checksum != Octal(header.AsSpan(148, 8))) throw new InvalidDataException("TARヘッダーのチェックサムが一致しません。");
-                dataRemaining = (size + 511) / 512 * 512;
-            }
-        }
-        private static long Octal(ReadOnlySpan<byte> field)
-        {
-            long result = 0;
-            bool ended = false, started = false;
-            foreach (byte b in field)
-            {
-                if (b is 0 or 32) { if (started) ended = true; continue; }
-                if (ended || b < '0' || b > '7') throw new InvalidDataException("TARヘッダーの数値表現が未対応または不正です。");
-                started = true;
-                result = checked(result * 8 + b - '0');
-            }
-            return result;
-        }
-        private static uint[] BuildCrcTable()
-        {
-            var table = new uint[256];
-            for (uint i = 0; i < table.Length; i++)
-            {
-                uint value = i;
-                for (int bit = 0; bit < 8; bit++) value = (value & 1) == 0 ? value >> 1 : (value >> 1) ^ 0xedb88320;
-                table[i] = value;
-            }
-            return table;
-        }
-        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
-        public override int Read(Span<byte> buffer)
-        {
-            token.ThrowIfCancellationRequested();
-            int n = inner.Read(limits.IgnoreReadLimits ? buffer : buffer[..(int)Math.Min(buffer.Length, Math.Max(1, limits.MaxExpandedBytes - BytesRead + 1))]);
-            BytesRead += n;
-            if (!limits.IgnoreReadLimits && BytesRead > limits.MaxExpandedBytes) throw new ReadLimitExceededException(ReadLimitKind.ExpandedBytes, "展開後の総容量上限を超えています。");
-            GuardHeaders(buffer[..n]);
-            foreach (byte value in buffer[..n])
-            {
-                crc = CrcTable[(crc ^ value) & 0xff] ^ (crc >> 8);
-                TrailingZeros = value == 0 ? TrailingZeros + 1 : 0;
-            }
-            return n;
-        }
-        public override bool CanRead => true;
-        public override bool CanSeek => false;
-        public override bool CanWrite => false;
-        public override long Length => throw new NotSupportedException();
-        public override long Position { get => BytesRead; set => throw new NotSupportedException(); }
-        public override void Flush() { }
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-    }
 }
-
-
-
-
-
-
-
-

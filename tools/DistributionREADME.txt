@@ -28,3 +28,9 @@ preferences.json（設定/履歴/ブックマーク） / RenderCache（透過写
 Updates（更新作業。成功した再起動後に整理し、失敗時は復旧用バックアップを保持）
 Help→ライセンスから原文を確認できます。
 Stable: https://github.com/PeaceKunihiro/KuniWhatsThisAsset/tree/master/Stable
+
+File→フォルダーにまとめて保存…で、全内容とGUID/metaを保持した別名の.unitypackageを作成できます。
+GNU LongLink/PAX/USTARと長いパスに対応します。保存後にCRC/配置先/メンバー内容を検証します。
+特殊フォルダーは元位置を保持する確認が必要です。固定パス参照の修正は行いません。
+Unity標準Import検知、AssetDatabase操作、Editor連携、プロジェクトへの直接配置は実装していません。
+元パッケージと既存の出力先は上書きしません。保存先には新しい名前を指定してください。

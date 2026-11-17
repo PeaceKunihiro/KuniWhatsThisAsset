@@ -35,7 +35,7 @@ public partial class MainWindow : Window
         scanCancellation = cts;
         StopImagePreview(); StopModelPreview();
         ClearPreviewFindings();
-        report = null;
+        report = null; RepackageMenu.IsEnabled = false;
         history.Clear(); historyIndex = -1; UpdateNavigation();
         PackageTree.Items.Clear(); fileNodes.Clear();
         Preview.Visibility = Visibility.Collapsed; Preview.Text = ""; PreviewHint.Text = "";
@@ -76,7 +76,7 @@ public partial class MainWindow : Window
         }
         finally
         {
-            scanCancellation = null;
+            scanCancellation = null; RepackageMenu.IsEnabled = report != null;
             OpenMenu.IsEnabled = ReloadButton.IsEnabled = true;
             CancelButton.Visibility = BusyProgress.Visibility = Visibility.Collapsed;
             BusyProgress.IsIndeterminate = false;
@@ -185,7 +185,7 @@ public partial class MainWindow : Window
     private void OnDragOver(object sender, DragEventArgs e) { e.Effects = scanCancellation == null && e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; }
     private void Cancel_Click(object sender, RoutedEventArgs e) => scanCancellation?.Cancel();
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
-    private void Limits_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "初期上限：パッケージ500 MiB（Setting → 読み込み設定から変更） / 展開相当1 GiB / メンバー256 MiB\n項目50,000 / アセット10,000 / 解析2分\nテキスト先頭2 MiB、全体32 MiB予算。超過後は先頭4 KiB。\nテキスト表示32,768文字。未解析部分は警告します。\n読み込み容量・件数・時間の上限に達した場合は継続を確認します。\n承認すると容量・件数・時間の上限を今回だけすべて解除し、先頭から再試行します。", "読み込み上限");
+    private void Limits_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "初期上限：パッケージ500 MiB（Setting → 読み込み設定から変更） / 展開相当1 GiB / メンバー256 MiB\n項目50,000 / アセット10,000 / 解析2分\nパス情報総量64 MiB。パッケージ内パス32,700文字（UTF-8 128 KiB）まで。\nGNU LongLink / PAX対応。リンク・疎ファイルは拒否。\nテキスト先頭2 MiB、全体32 MiB予算。超過後は先頭4 KiB。\nテキスト表示32,768文字。未解析部分は警告します。\n読み込み容量・件数・時間の上限に達した場合は継続を確認します。\n承認すると容量・件数・時間の上限を今回だけすべて解除し、先頭から再試行します。", "読み込み上限");
     private void Help_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this, "Fileから開くか、パッケージをドロップします。\nAlt＋左クリックで枝以下を一括展開・格納します。\n右側はプレビュー専用です。FBX・OBJ・Prefabの静止近似表示に対応しています。\n異常検出時だけ下部に通知します。クリックで詳細を開きます。\n検出は静的ルールによるものです。未検出は安全性を保証しません。\nバージョン情報を開くと1日1回GitHubへ更新確認します。\n失敗時や当日確認済みの場合はStableへのリンクだけを表示します。", "使い方");
     private void Licenses_Click(object sender, RoutedEventArgs e) => new LicenseWindow { Owner = this }.ShowDialog();
     private void About_Click(object sender, RoutedEventArgs e) => new AboutWindow { Owner = this }.ShowDialog();

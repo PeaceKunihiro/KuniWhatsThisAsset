@@ -150,7 +150,7 @@ Test("preview and unexpected members are checked", () =>
     Check(r.Findings.Any(f => f.Code == "BINARY_EXECUTABLE" && f.Path.EndsWith("preview.png")), "preview未解析");
     Check(r.Findings.Any(f => f.Code == "EXECUTABLE" && f.Path.EndsWith("hidden.ps1")), "未知メンバー未解析");
 });
-Test("reject PAX metadata before processing payload", () =>
+Test("reject incomplete PAX package after metadata processing", () =>
 {
     string file = Path.Combine(output, "pax.unitypackage");
     using (var fs = File.Create(file)) using (var zip = new GZipStream(fs, CompressionLevel.Fastest)) using (var writer = new TarWriter(zip, TarEntryFormat.Pax))
@@ -340,6 +340,8 @@ Test("Prefab parser rejects binary and resolves inactive ancestors", () =>
     var prefab = PrefabAnalysis.Parse(text); Check(!prefab.RootActive && !prefab.Renderers[0].Enabled, "Inactive ancestor ignored");
 });
 SelfUpdateChecks.Run(output, Test, Check);
+RepackageChecks.Run(output, Test, Check);
+TarExtensionChecks.Run(output, Test, Check);
 Console.WriteLine($"\n{passed} passed, {failed} failed. Fixtures: {output}");
 return failed == 0 ? 0 : 1;
 

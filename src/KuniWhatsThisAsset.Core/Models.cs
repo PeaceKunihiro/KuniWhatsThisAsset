@@ -21,6 +21,7 @@ public sealed record ScanLimits
     public long MaxPackageBytes { get; init; } = 500L * 1024 * 1024;
     public long MaxExpandedBytes { get; init; } = 1024L * 1024 * 1024;
     public long MaxMemberBytes { get; init; } = 256L * 1024 * 1024;
+    public long MaxPathBytes { get; init; } = 64L * 1024 * 1024;
     public int MaxEntries { get; init; } = 50_000;
     public int MaxAssets { get; init; } = 10_000;
     public int MaxTextBytes { get; init; } = 2 * 1024 * 1024;

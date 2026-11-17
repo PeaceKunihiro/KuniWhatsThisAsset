@@ -1,10 +1,10 @@
-現在の作業：v0.11.0（2026-11-16）完了
-- .NET/WPF/SharpAssimp/Assimpを圧縮単一EXEへ内蔵。直下4項目、ZIP内11ファイル。残存文書/配布一覧はLibsへ。
-- Aboutに手動更新確認とダウンロード自己更新・再起動・進捗を追加。自動の日次制限は維持し、手動は解除。
-- 固定GitHub URL、ZIP SHA256、Libs/distribution.jsonの版と個別ハッシュを検証。未知形式/パス逸脱/リンク/設定混入を拒否。
-- 配布対象だけをバックアップ/置換/失敗時復元。ユーザー設定/履歴/ブックマーク/キャッシュと管理外ファイルは保持。
-- helper READY、親の識別/終了待ち、ロック解放待ち、新版起動後の作業整理に対応。終了時の解析キャンセルも実装。
-- Core 61件とUI、発行版の実プロセス0.10.1→0.11.0置換/新版WPF起動/設定保持を検証。単一EXEのモデルworkerも成功。
-- Stable ZIP/SHA256とLibs配布一覧を作成。README/仕様/更新履歴/開発/更新設計を更新。公開物にテストデータは含まない。
-- GitHubへの公開・アップロードは未実施。公開時は同版ZIPと.sha256をStableへセットで配置する。
-- 最終発行フォルダー：artifacts/KuniWhatsThisAsset-v0.11.0-win-x64-final3。再発行はtools/Publish-Stable.ps1へ新しいartifacts出力先を指定する。
+現在の作業：v0.12.0（2026-11-17）完了
+- File→フォルダーにまとめて保存を追加。全アセットのpathnameを変更し別名保存。GUID/asset/meta/preview等を保持する。
+- GNU LongLink/PAX/USTAR、長いパッケージ内パスと260文字超の実ファイルパスに対応。共通ストリーム検証でCRC/終端/パス/リンク/重複/容量を検査。
+- 一時ファイルへ出力後に全メンバーのハッシュ・GUID・配置先を読み戻し検証。元/既存ファイルを上書きしない。
+- 特殊フォルダーは明示チェックで元の配置を保持。Unity標準Import検知/通知、AssetDatabase.Refresh/StartAssetEditing、その他Unity依存機能は追加しない。
+- ビルド警告/エラー0、Core74件成功。WPFの保存ダイアログ・既存プレビュー・パッシブ警告・更新UI成功。
+- Fuzzy134→135/Luchika167→168アセット、全メンバー照合成功。Akyo/ネコメイド6経路の既存プレビューも成功。Unity Editorの実Importは未検証。
+- 配布版helperによる0.10.1→0.12.0更新/再起動/設定とキャッシュ保持を隔離フォルダーで確認。
+- Stable/KuniWhatsThisAsset-v0.12.0-win-x64.zip と .sha256 を作成し照合。配布は11ファイル、テストデータ/生成パッケージは含めない。
+- README/仕様書/開発資料/検討記録/更新履歴を更新。GitHubへのpushは行っていない。

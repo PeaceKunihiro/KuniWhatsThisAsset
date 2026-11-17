@@ -15,7 +15,7 @@ public static class ModelWorker
             Console.OutputEncoding = Encoding.UTF8;
             using var input = Console.OpenStandardInput();
             using var reader = new BinaryReader(input, Encoding.UTF8, leaveOpen: true);
-            string ReadName() { int n = reader.ReadInt32(); if (n < 1 || n > 4096) throw new InvalidDataException("入力パスが不正です。"); var b = reader.ReadBytes(n); if (b.Length != n) throw new EndOfStreamException(); return new UTF8Encoding(false, true).GetString(b); }
+            string ReadName() { int n = reader.ReadInt32(); if (n < 1 || n > 131072) throw new InvalidDataException("入力パスが不正です。"); var b = reader.ReadBytes(n); if (b.Length != n) throw new EndOfStreamException(); return new UTF8Encoding(false, true).GetString(b); }
             byte[] ReadBytes(int max) { int n = reader.ReadInt32(); if (n < 0 || n > max) throw new InvalidDataException("モデル入力が大きすぎます。"); byte[] b = reader.ReadBytes(n); if (b.Length != n) throw new EndOfStreamException(); return b; }
             string path = ReadName();
             if (Path.GetExtension(path).ToLowerInvariant() is not (".fbx" or ".obj")) throw new InvalidDataException("モデル形式が未対応です。");

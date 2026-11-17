@@ -170,3 +170,17 @@ tools/Publish-Stable.ps1（PowerShell 7）がクリーンなartifacts発行先�
 Coreの追加8検証で手動制限、HTTP/ハッシュ失敗、キャンセル、不正ZIP、設定維持、ロールバック、管理外ファイル衝突を確認。WPFでは手動/進捗/失敗復帰/閉じるキャンセルを確認。--published-updateは0.10.1発行版とStableの0.11.0 ZIPを使い、実helperが旧workerの終了を待って更新し、新しいWPFウィンドウを起動して設定/キャッシュを保つことを隔離フォルダー内で検証する。
 
 参考：[.NET single-file公式資料](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)、[GitHub Contents API](https://docs.github.com/en/rest/repos/contents#get-repository-content)
+
+## v0.12.0 スタンドアロンのリパッケージ
+
+PackageRepackagerは全アセットのpathnameをAssets/<指定フォルダー>/以下へ移動する。元GUID、asset、asset.meta、preview、その他のメンバーの内容を保持する。Assets自身のフォルダー項目があれば再使用し、なければ新しいフォルダーGUIDとmetaを追加する。特殊ルートフォルダーは確認して元の配置を保持する。固定文字列で記述されたパスは書き換えない。
+
+Analyze時の圧縮ファイルSHA256を保存し、保存開始・終了時に照合する。FileShare.Readで入力を保持し、同一ディレクトリ内の一時ファイルへストリーム出力する。出力を再解析し、GUID/配置先と全通常メンバーのSHA256を照合してから、上書き不可で最終名へ移す。失敗・キャンセル時は一時ファイルを削除する。
+
+UnityPackageArchiveを読み込み・リパッケージで共有する。USTAR、GNU LongLink、PAX local/global path/sizeと空属性による解除を処理し、拡張レコードを物理件数・展開量に算入する。PAX sizeを中間の制御ヘッダーへ適用しない。拡張情報は1件1 MiB、総量64 MiB、属性4096個まで。CRC、ヘッダーチェックサム、二重終端、UTF-8、パス、重複を検証し、リンク・疎ファイルは拒否する。pathnameは128 KiB/32700文字、各要素255文字。パス情報総量64 MiBは読み込み継続承認で解除可能。拡張情報の固定メモリ上限は解除しない。
+
+出力はPackageTarWriterでUSTARを基本に、長いメンバー名にGNU LongLinkを付ける。OS上の長いファイルパスにも対応する。Unity標準Import検知・通知、AssetDatabase.Refresh/StartAssetEditing等のUnity依存機能は追加しない。
+
+Core全74件、WPFの入力検証・保存、GNU/PAXの.NET TarReaderによる独立読み戻しを検証。Fuzzyは134→135アセット、Luchikaは167→168アセットとなり、全ペイロードとmetaのハッシュ一致を確認した。Unity Editorでの実Importは未検証。実データと生成パッケージはignored artifacts内だけに保持し、配布には含めない。
+
+形式参考：[GNU tar format](https://www.gnu.org/software/tar/manual/html_node/Standard.html)、[POSIX pax](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/pax.html)。本機能は独自実装で、JUIコードの取り込みや新しい外部依存はない。

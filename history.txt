@@ -131,3 +131,25 @@
 - Core 61件、WPF UIの手動/進捗/チェックサム失敗/キャンセル、隔離した発行版の0.10.1→0.11.0置換・WPF画面再起動・設定/キャッシュ保持を確認。
 - 単一EXEの内蔵AssimpでOBJを解析。Sharlen FBXの髪Y=1.1789832～1.65755も維持。公開物にユーザーアセット・設定・キャッシュ・ルートDLL/PDBがないことを確認。
 - 最終ZIP 63652774 bytes / SHA256 941a65a81c2ed587e43490a98f4a9383485d744fa0d8b6407e7cfacc959b5760  KuniWhatsThisAsset-v0.11.0-win-x64.zip
+
+2026-11-17 JUI統合検討（実装変更なし）
+- JUI main 5c9398b15e71e6b2166351edfab91baac437a896のREADME/仕様/ソース/MIT原文を確認。
+- 選択書き出し、配置先変更、パッケージ名集約、競合検査、バックアップ/復元、プリセット等は移植可能と判断。
+- EditorWindow/AssetDatabase/EditorUserSettingsと標準Import監視はUnity依存。KWTA向けCore分離と、必要に応じたEditor連携を推奨。
+- 初期はプロジェクト外への選択書き出し、その後に閉じたUnityプロジェクトへの配置を推奨。開いたUnityのAssetsへ書くと自動Refresh/コードコンパイルが起こり得る。
+- JUIの全データ保持型TAR Readerは移植せず、既存の検証付きストリーム処理を拡張。GNU/PAX、フォルダーGUID、復元と完全Undoの違い等も整理。
+- 詳細：Documents/JuiIntegrationPlan-2026-11-17.md。コード/バージョン0.11.0/Stable ZIPは変更せず、実装・Unity動作検証は行っていない。
+
+2026-11-17 JUI統合方針の更新（ユーザー指定）
+- 主目的をフォルダー集約とし、.unitypackage内のpathnameを変更するリパッケージを第一候補へ変更。
+- 全アセット/既存GUID/.meta保持、まとめ先名指定、別名保存、読み戻し検証を初回案に整理。部分選択/Unity直接書き込み/Editor連携は初回範囲外。
+- パス文字列参照と特殊フォルダーの例外、既存GUID導入済みプロジェクトでの実機検証が必要であることを追記。
+- Documents/JuiIntegrationPlan-2026-11-17.mdを更新。実装・版0.11.0・配布物は変更していない。
+
+2026-11-17 v0.12.0 フォルダー集約リパッケージ
+- ユーザー指定のGNU LongLink/PAX・長アドレス対応を含むスタンドアロン再梱包を実装。Unity Import検知/通知・AssetDatabase・その他Unity必須機能は実装対象外。
+- pathnameだけを変更し、全アセット/GUID/metaを保持。新規ルートmeta、特殊ルート保持の確認、別名保存、入力SHA照合、一時出力と全メンバー読み戻し照合を追加。
+- TAR読み込みを共通化。GNU/PAX拡張・正規化・CRC・終端・メモリ予算・不正構造拒否を検証。
+- ビルド警告/エラー0、Core74件とWPFテスト成功。Fuzzy/Luchika実データで全メンバー保持、既存Akyo/ネコメイド6表示経路も成功。
+- 単一EXE配布版の0.10.1→0.12.0自己更新/再起動/設定保持テスト成功。StableへZIP/SHA256作成・照合、配布11ファイルに有償アセット/生成パッケージなし。
+- README/仕様書/開発資料/検討記録を更新。Unity Editorでの実Importは未検証。GitHub pushは未実施。
